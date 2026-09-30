@@ -23,6 +23,32 @@ self.addEventListener('activate', (evento) => {
   self.clients.claim();
 });
 
+// Aviso de novo agendamento: mostra a notificação no celular.
+self.addEventListener('push', (evento) => {
+  let dados = { titulo: 'Martinho', corpo: 'Você tem uma novidade na agenda.', url: '/' };
+  try { dados = Object.assign(dados, evento.data.json()); } catch (e) {}
+  evento.waitUntil(self.registration.showNotification(dados.titulo, {
+    body: dados.corpo,
+    icon: '{% static "img/icone-192.png" %}',
+    badge: '{% static "img/icone-192.png" %}',
+    data: { url: dados.url },
+  }));
+});
+
+// Toque na notificação: abre a agenda naquele dia.
+self.addEventListener('notificationclick', (evento) => {
+  evento.notification.close();
+  const url = (evento.notification.data && evento.notification.data.url) || '/';
+  evento.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((janelas) => {
+      for (const janela of janelas) {
+        if ('focus' in janela) { janela.navigate(url); return janela.focus(); }
+      }
+      return self.clients.openWindow(url);
+    })
+  );
+});
+
 self.addEventListener('fetch', (evento) => {
   const pedido = evento.request;
   if (pedido.method !== 'GET') return;

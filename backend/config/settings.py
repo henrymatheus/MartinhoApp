@@ -89,6 +89,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'apps.contas.contexto.push',
             ],
         },
     },
@@ -154,6 +155,14 @@ STORAGES = {
 }
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+
+# Notificações push (aviso de novo agendamento no celular do barbeiro).
+# Gere as chaves com: python manage.py gerar_chaves_push
+# Sem elas, o botão "Ativar avisos" não aparece e nada é enviado.
+VAPID_PUBLIC_KEY = os.environ.get('VAPID_PUBLIC_KEY', '')
+VAPID_PRIVATE_KEY = os.environ.get('VAPID_PRIVATE_KEY', '')
+VAPID_EMAIL = os.environ.get('VAPID_EMAIL', 'mailto:contato@martinho.app')
 
 
 # Segurança em produção (Render serve por HTTPS atrás de um proxy).

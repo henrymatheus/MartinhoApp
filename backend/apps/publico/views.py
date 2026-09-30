@@ -16,10 +16,11 @@ from django.urls import reverse
 from django.utils import timezone
 from django.views import View
 
-from apps.agenda.disponibilidade import dias_de_atendimento, esta_livre, horarios_livres
+from apps.agenda.disponibilidade import barbeiros_do_dia, dias_com_algum_barbeiro, esta_livre
 from apps.agenda.models import Agendamento
 from apps.cadastros.models import Barbeiro, Cliente, Servico
 from apps.contas.models import Barbearia
+from apps.contas.notificacoes import notificar_novo_agendamento
 from apps.contas.telefones import mesmo_telefone, somente_digitos
 
 from .forms import ConfirmarAgendamentoForm
@@ -36,30 +37,42 @@ def barbearia_publica(slug):
 
 def ler_escolhas(barbearia, dados):
     """
-    Interpreta o que o cliente já escolheu (serviço, barbeiro, dia, hora) e
-    calcula as opções do próximo passo. Uma escolha inválida é ignorada, e
-    o cliente volta ao passo correspondente.
+    Interpreta o que o cliente já escolheu e calcula as opções do próximo passo.
+
+    Fluxo: serviço -> dia -> barbeiros que atendem naquele dia, cada um com os
+    seus horários livres -> dados do cliente. O cliente escolhe o barbeiro e o
+    horário no mesmo toque.
+
+    O parâmetro "barbeiro" no endereço também serve de filtro: o link
+    /agendar/<barbearia>/?barbeiro=3 mostra só os horários daquele barbeiro,
+    para cada um divulgar o seu. Uma escolha inválida é ignorada.
     """
     servicos = list(Servico.objects.filter(barbearia=barbearia, ativo=True))
     # Só barbeiros com algum horário cadastrado aparecem para o cliente.
     barbeiros = list(Barbeiro.objects.filter(barbearia=barbearia, ativo=True, horarios__isnull=False).distinct())
 
-    e = {'servicos': servicos, 'barbeiros': barbeiros, 'servico': None, 'barbeiro': None,
-         'dias': [], 'dia': None, 'horarios': [], 'inicio': None}
+    e = {'servicos': servicos, 'servico': None, 'barbeiro': None, 'dias': [], 'dia': None,
+         'opcoes': [], 'inicio': None}
     e['servico'] = next((s for s in servicos if str(s.pk) == dados.get('servico')), None)
-    if e['servico']:
-        e['barbeiro'] = next((b for b in barbeiros if str(b.pk) == dados.get('barbeiro')), None)
+    e['barbeiro'] = next((b for b in barbeiros if str(b.pk) == dados.get('barbeiro')), None)
+    if not e['servico']:
+        return e
+
+    candidatos = [e['barbeiro']] if e['barbeiro'] else barbeiros
+    e['dias'] = dias_com_algum_barbeiro(candidatos)
+    try:
+        dia = date.fromisoformat(dados.get('data', ''))
+    except ValueError:
+        dia = None
+    if dia not in e['dias']:
+        return e
+
+    e['dia'] = dia
+    e['opcoes'] = barbeiros_do_dia(candidatos, e['servico'], dia)
     if e['barbeiro']:
-        e['dias'] = dias_de_atendimento(e['barbeiro'])
-        try:
-            dia = date.fromisoformat(dados.get('data', ''))
-        except ValueError:
-            dia = None
-        if dia in e['dias']:
-            e['dia'] = dia
-            e['horarios'] = horarios_livres(e['barbeiro'], e['servico'], dia)
-            hora = dados.get('hora', '')
-            e['inicio'] = next((h for h in e['horarios'] if timezone.localtime(h).strftime('%H:%M') == hora), None)
+        hora = dados.get('hora', '')
+        livres = next((h for b, h in e['opcoes'] if b == e['barbeiro']), [])
+        e['inicio'] = next((h for h in livres if timezone.localtime(h).strftime('%H:%M') == hora), None)
     return e
 
 
@@ -124,6 +137,10 @@ class AgendarView(View):
                     observacoes='Agendado pelo cliente na página online.',
                 )
                 agendamento.save()  # o save() trava o barbeiro e verifica conflito
+                # O aviso ao barbeiro só sai depois que a gravação for
+                # confirmada no banco (on_commit). Se ele falhar, o
+                # agendamento continua valendo.
+                transaction.on_commit(lambda: notificar_novo_agendamento(agendamento))
         except ValidationError:
             form.add_error(None, 'Esse horário acabou de ser ocupado. Escolha outro, por favor.')
             return self.mostrar(request, barbearia, ler_escolhas(barbearia, request.POST), form)
@@ -205,7 +222,7 @@ def manifesto_barbearia(request, slug):
 
 def service_worker(request):
     # Servido na raiz (/sw.js) para poder atender todas as páginas do site.
-    resposta = render(request, 'publico/sw.js', {'versao': 'v1'}, content_type='application/javascript')
+    resposta = render(request, 'publico/sw.js', {'versao': 'v2'}, content_type='application/javascript')
     resposta['Cache-Control'] = 'no-cache'
     return resposta
 

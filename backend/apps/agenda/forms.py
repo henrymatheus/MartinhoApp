@@ -1,10 +1,11 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from django import forms
 from django.utils import timezone
 
 from apps.cadastros.models import Barbeiro, Cliente, Servico
 
+from .disponibilidade import ausente_em
 from .models import Agendamento
 
 
@@ -12,6 +13,8 @@ class AgendamentoForm(forms.ModelForm):
     # Data e hora ficam em dois campos na tela; o model tem um só (inicio).
     data = forms.DateField(widget=forms.DateInput(attrs={'type': 'date'}, format='%Y-%m-%d'))
     hora = forms.TimeField(widget=forms.TimeInput(attrs={'type': 'time', 'step': 300}, format='%H:%M'))
+    # Só aparece na tela quando o barbeiro está ausente no horário escolhido.
+    agendar_mesmo_assim = forms.BooleanField(label='Agendar mesmo assim (encaixe)', required=False)
 
     class Meta:
         model = Agendamento
@@ -41,4 +44,16 @@ class AgendamentoForm(forms.ModelForm):
             self.instance.inicio = timezone.make_aware(datetime.combine(data, hora))
             # Ao remarcar, o fim antigo não vale mais: é recalculado pelo serviço.
             self.instance.fim = None
+
+            # A barbearia pode agendar com um barbeiro ausente (um encaixe, por
+            # exemplo), mas precisa confirmar de propósito.
+            barbeiro, servico = dados.get('barbeiro'), dados.get('servico')
+            if barbeiro and servico and not dados.get('agendar_mesmo_assim'):
+                fim = self.instance.inicio + timedelta(minutes=servico.duracao_minutos)
+                if ausente_em(barbeiro, self.instance.inicio, fim):
+                    self.ausencia_detectada = True
+                    raise forms.ValidationError(
+                        f'{barbeiro} está ausente nesse horário. Escolha outro barbeiro ou horário, '
+                        'ou marque "Agendar mesmo assim".'
+                    )
         return dados

@@ -59,9 +59,11 @@ Regras fixas:
 | 11 | Backup diário do banco | 📋 | `pg_dump` pelo GitHub Actions |
 | 12 | Servidor sempre acordado | 📋 | Substitui a tela de "carregando": GitHub Actions acessa o site a cada 10 minutos |
 | 13 | Dados de demonstração | ✅ | `python manage.py dados_demo` (só no SQLite), com horários de trabalho e uma folga |
-| 14 | Horários de trabalho dos barbeiros | ✅ | Tela Horários: até dois turnos por dia (o intervalo é o almoço) e folgas/férias. Usuário com papel "barbeiro" ligado a um barbeiro só edita os próprios |
-| 15 | Agendamento online pelo cliente | ✅ | `/agendar/<endereço-da-barbearia>/`, sem login: serviço → barbeiro (obrigatório) → dia → horário livre → nome e WhatsApp. Confirmado na hora. Cliente reconhecido pelo telefone. Máximo de 3 horários futuros por telefone. Horários a cada 15 min, com 1 h de antecedência mínima, até 30 dias à frente |
+| 14 | Horários de trabalho dos barbeiros | ✅ | Tela Horários: até dois turnos por dia (o intervalo é o almoço) e ausências (folga, férias, consulta), de dias inteiros ou de parte de um dia. Usuário com papel "barbeiro" ligado a um barbeiro só edita os próprios |
+| 15 | Agendamento online pelo cliente | ✅ | `/agendar/<endereço-da-barbearia>/`, sem login: serviço → dia → barbeiros que atendem naquele dia, cada um com os seus horários livres (o cliente escolhe barbeiro e horário no mesmo toque) → nome e WhatsApp. Quem está ausente não aparece. Link pessoal de cada barbeiro: `?barbeiro=<id>`. Confirmado na hora. Cliente reconhecido pelo telefone. Máximo de 3 horários futuros por telefone. Horários a cada 15 min, com 1 h de antecedência mínima, até 30 dias à frente |
 | 16 | PWA (instalar como app) | ✅ | Manifesto do sistema (`/`) e um por barbearia (página de agendamento), ícones, service worker com página offline |
+| 17 | Equipe do dia e faltas | ✅ | Na Agenda: situação de cada barbeiro (atendendo, ausente, sem expediente) e botões "Faltou hoje", "Saiu agora" e "Desfazer ausência". Horários já marcados com quem faltou ficam destacados, com "Avisar cliente no WhatsApp". Nada é cancelado sozinho. O agendamento interno avisa e pede confirmação ("Agendar mesmo assim") |
+| 18 | Aviso de novo agendamento ao barbeiro | ✅ | Notificação push (grátis, Web Push/VAPID) quando o cliente agenda pela página. O barbeiro toca em "Ativar avisos" no Martinho. Vai para o barbeiro com login; se ele não tiver, para os donos. Precisa das variáveis `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` e `VAPID_EMAIL` (`python manage.py gerar_chaves_push`). iPhone: só com o Martinho instalado na tela inicial (iOS 16.4+) |
 
 ## 5. Funcionalidades do sistema legado (desktop Tkinter)
 
@@ -93,6 +95,7 @@ Funcionalidades existentes em `legacy/main.py`, `legacy/agendamento.py` e `legac
 | 2026-09-30 | Desenvolvimento local com SQLite e sem `.env` obrigatório; PostgreSQL (Supabase) só em produção |
 | 2026-09-30 | **Telas no Django clássico (templates), no lugar de React.** Um só projeto e um só deploy. Sai o Django REST Framework, o JWT e o Cloudflare Pages |
 | 2026-09-30 | Agendamento online entra no MVP: cliente se identifica só com nome e telefone, agendamento confirmado na hora, cliente sempre escolhe o barbeiro |
+| 2026-09-30 | Página do cliente muda para dia → barbeiros daquele dia → horário. Ausência pode ser de parte do dia. Aviso ao barbeiro por push do PWA (grátis); WhatsApp automático fica de fora por custo (API oficial paga) ou risco de banimento (soluções não oficiais) |
 
 ## 7. Fora do MVP (ideias futuras)
 
@@ -115,3 +118,4 @@ Funcionalidades existentes em `legacy/main.py`, `legacy/agendamento.py` e `legac
 | 2026-09-30 | Horários de trabalho e folgas, agendamento online pelo cliente, PWA. Deploy no Render: `ALLOWED_HOSTS` automático. 54 testes |
 | 2026-09-30 | Primeiro deploy no Render (https://martinhoapp.onrender.com), banco de produção no Supabase. Corrigida a migration do `slug` no PostgreSQL |
 | 2026-09-30 | Agenda: dia sem horários mostra os próximos agendamentos (um horário marcado pelo cliente para outro dia parecia ter sumido). 55 testes |
+| 2026-09-30 | Equipe do dia e faltas na Agenda, ausência de parte do dia, página do cliente por dia com todos os barbeiros disponíveis, notificação push ao barbeiro. 80 testes |

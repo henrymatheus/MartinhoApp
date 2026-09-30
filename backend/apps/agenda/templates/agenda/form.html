@@ -20,6 +20,9 @@
   {% include 'includes/campo.html' with campo=form.barbeiro %}
   {% include 'includes/campo.html' with campo=form.servico %}
   {% include 'includes/campo.html' with campo=form.observacoes %}
+  {% if form.ausencia_detectada or form.agendar_mesmo_assim.value %}
+    <label class="marcar">{{ form.agendar_mesmo_assim }} {{ form.agendar_mesmo_assim.label }}</label>
+  {% endif %}
   <div class="linha-acoes">
     <button class="btn btn--primario" type="submit">{% if object %}Salvar{% else %}Agendar{% endif %}</button>
     <a class="btn btn--secundario" href="{% url 'agenda:dia' %}">Voltar</a>

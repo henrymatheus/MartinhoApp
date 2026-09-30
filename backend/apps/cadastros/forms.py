@@ -91,12 +91,15 @@ class SemanaForm(forms.Form):
 class BloqueioForm(forms.ModelForm):
     class Meta:
         model = Bloqueio
-        fields = ['data_inicio', 'data_fim', 'motivo']
+        fields = ['data_inicio', 'data_fim', 'hora_inicio', 'hora_fim', 'motivo']
         widgets = {
             'data_inicio': forms.DateInput(attrs={'type': 'date'}, format='%Y-%m-%d'),
             'data_fim': forms.DateInput(attrs={'type': 'date'}, format='%Y-%m-%d'),
-            'motivo': forms.TextInput(attrs={'placeholder': 'Folga, férias, curso…'}),
+            'hora_inicio': forms.TimeInput(attrs={'type': 'time', 'step': 900}, format='%H:%M'),
+            'hora_fim': forms.TimeInput(attrs={'type': 'time', 'step': 900}, format='%H:%M'),
+            'motivo': forms.TextInput(attrs={'placeholder': 'Folga, férias, consulta…'}),
         }
+        help_texts = {'hora_inicio': 'Deixe em branco para o dia inteiro.'}
 
     def __init__(self, *args, barbeiro, **kwargs):
         super().__init__(*args, **kwargs)

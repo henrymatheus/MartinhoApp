@@ -132,6 +132,14 @@ class Agendamento(PertenceABarbearia):
             ItemAtendimento.objects.create(atendimento=atendimento, servico=self.servico)
         return atendimento
 
+    def mensagem_ausencia(self):
+        inicio = timezone.localtime(self.inicio)
+        return (
+            f'Olá, {self.cliente.nome.split()[0]}! Aqui é da {self.barbearia.nome}. '
+            f'O {self.barbeiro.nome} não vai poder atender no seu horário de {inicio:%d/%m} às {inicio:%H:%M}. '
+            'Podemos remarcar ou passar para outro barbeiro?'
+        )
+
     def mensagem_lembrete(self):
         inicio = timezone.localtime(self.inicio)
         return (

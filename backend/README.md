@@ -39,7 +39,15 @@ Web Service ligado ao repositório, com:
 | Build Command | `pip install -r requirements.txt && python manage.py collectstatic --no-input && python manage.py migrate` |
 | Start Command | `gunicorn config.wsgi:application` |
 
-Variáveis de ambiente: `DJANGO_SECRET_KEY` e `DATABASE_URL` (Supabase). O endereço `.onrender.com` é liberado automaticamente.
+Variáveis de ambiente:
+
+| Variável | Para quê |
+|---|---|
+| `DJANGO_SECRET_KEY` | Chave secreta do Django (botão Generate do Render) |
+| `DATABASE_URL` | Banco do Supabase |
+| `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_EMAIL` | Avisos push ao barbeiro. Gere com `python manage.py gerar_chaves_push`. Sem elas, o botão "Ativar avisos" não aparece |
+
+O endereço `.onrender.com` é liberado automaticamente.
 
 ## Testes
 

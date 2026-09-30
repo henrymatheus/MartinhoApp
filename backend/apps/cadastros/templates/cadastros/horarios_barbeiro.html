@@ -38,8 +38,8 @@
 </form>
 
 <section class="formulario">
-  <h2 class="subtitulo">Folgas e férias</h2>
-  <p class="legenda">Nesses dias o barbeiro não aparece para os clientes. Agendamentos já marcados não são cancelados.</p>
+  <h2 class="subtitulo">Folgas, férias e ausências</h2>
+  <p class="legenda">Nesses períodos o barbeiro não aparece para os clientes. Com horário, vale só aquele trecho de um dia. Agendamentos já marcados não são cancelados: eles ficam destacados na agenda.</p>
   {% if folgas %}
     <div class="tabela-rolagem">
       <table class="tabela">
@@ -65,9 +65,11 @@
     <div class="formulario__grade">
       {% include 'includes/campo.html' with campo=folga.data_inicio %}
       {% include 'includes/campo.html' with campo=folga.data_fim %}
+      {% include 'includes/campo.html' with campo=folga.hora_inicio %}
+      {% include 'includes/campo.html' with campo=folga.hora_fim %}
       {% include 'includes/campo.html' with campo=folga.motivo %}
     </div>
-    <div class="linha-acoes"><button class="btn btn--secundario" type="submit">Adicionar folga</button></div>
+    <div class="linha-acoes"><button class="btn btn--secundario" type="submit">Adicionar ausência</button></div>
   </form>
 </section>
 {% endblock %}

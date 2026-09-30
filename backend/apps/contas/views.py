@@ -1,5 +1,11 @@
+import json
+
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.http import JsonResponse
 from django.shortcuts import render
+from django.views import View
+
+from .models import InscricaoPush
 
 
 class DaBarbeariaMixin(LoginRequiredMixin):
@@ -28,3 +34,39 @@ class DaBarbeariaMixin(LoginRequiredMixin):
         contexto = super().get_context_data(**kwargs)
         contexto['secao'] = self.secao
         return contexto
+
+
+class InscricaoPushView(LoginRequiredMixin, View):
+    """
+    Recebe do navegador os dados da inscrição em avisos (POST com JSON) e
+    guarda para o usuário logado. DELETE cancela a inscrição do aparelho.
+    """
+
+    def post(self, request):
+        try:
+            dados = json.loads(request.body)
+            endpoint = dados['endpoint']
+            chaves = dados['keys']
+            p256dh, auth = chaves['p256dh'], chaves['auth']
+        except (ValueError, KeyError, TypeError):
+            return JsonResponse({'erro': 'Inscrição inválida.'}, status=400)
+        if not endpoint.startswith('https://'):
+            return JsonResponse({'erro': 'Inscrição inválida.'}, status=400)
+        InscricaoPush.objects.update_or_create(
+            endpoint=endpoint,
+            defaults={
+                'usuario': request.user,
+                'p256dh': p256dh,
+                'auth': auth,
+                'navegador': request.headers.get('User-Agent', '')[:200],
+            },
+        )
+        return JsonResponse({'ok': True})
+
+    def delete(self, request):
+        try:
+            endpoint = json.loads(request.body)['endpoint']
+        except (ValueError, KeyError, TypeError):
+            return JsonResponse({'erro': 'Inscrição inválida.'}, status=400)
+        InscricaoPush.objects.filter(endpoint=endpoint, usuario=request.user).delete()
+        return JsonResponse({'ok': True})

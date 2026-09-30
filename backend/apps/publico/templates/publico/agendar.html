@@ -1,19 +1,27 @@
 {% extends 'publico/base_publica.html' %}
 {% block conteudo %}
+{# O parâmetro "barbeiro" no endereço filtra a página para um só barbeiro (link pessoal). #}
+
+{% if e.barbeiro and not e.inicio %}
+  <p class="filtro">
+    Horários de <strong>{{ e.barbeiro.nome }}</strong>.
+    <a href="?{% if e.servico %}servico={{ e.servico.pk }}{% endif %}{% if e.dia %}&data={{ e.dia|date:'Y-m-d' }}{% endif %}#passo-dia">Ver todos os barbeiros</a>
+  </p>
+{% endif %}
 
 {# Passo 1: serviço #}
 <section class="passo" id="passo-servico">
   <div class="passo__titulo">
     <span class="passo__numero">1</span>
     <h2 class="subtitulo">Serviço</h2>
-    {% if e.servico %}<a class="passo__trocar" href="?#passo-servico">Trocar</a>{% endif %}
+    {% if e.servico %}<a class="passo__trocar" href="?{% if e.barbeiro %}barbeiro={{ e.barbeiro.pk }}{% endif %}#passo-servico">Trocar</a>{% endif %}
   </div>
   {% if e.servico %}
     <p class="passo__escolha">{{ e.servico.nome }} · {{ e.servico.duracao_minutos }} min · R$ {{ e.servico.preco }}</p>
   {% elif e.servicos %}
     <ul class="opcoes">
       {% for s in e.servicos %}
-        <li><a class="opcao" href="?servico={{ s.pk }}#passo-barbeiro">
+        <li><a class="opcao" href="?servico={{ s.pk }}{% if e.barbeiro %}&barbeiro={{ e.barbeiro.pk }}{% endif %}#passo-dia">
           <span class="opcao__nome">{{ s.nome }}</span>
           <span class="opcao__detalhe">{{ s.duracao_minutos }} min</span>
           <span class="opcao__preco">R$ {{ s.preco }}</span>
@@ -25,63 +33,54 @@
   {% endif %}
 </section>
 
-{# Passo 2: barbeiro #}
+{# Passo 2: dia #}
 {% if e.servico %}
-<section class="passo" id="passo-barbeiro">
-  <div class="passo__titulo">
-    <span class="passo__numero">2</span>
-    <h2 class="subtitulo">Barbeiro</h2>
-    {% if e.barbeiro %}<a class="passo__trocar" href="?servico={{ e.servico.pk }}#passo-barbeiro">Trocar</a>{% endif %}
-  </div>
-  {% if e.barbeiro %}
-    <p class="passo__escolha">{{ e.barbeiro.nome }}</p>
-  {% elif e.barbeiros %}
-    <ul class="opcoes opcoes--grade">
-      {% for b in e.barbeiros %}
-        <li><a class="opcao opcao--centro" href="?servico={{ e.servico.pk }}&barbeiro={{ b.pk }}#passo-dia">
-          <span class="opcao__inicial" aria-hidden="true">{{ b.nome|first }}</span>
-          <span class="opcao__nome">{{ b.nome }}</span>
-        </a></li>
-      {% endfor %}
-    </ul>
-  {% else %}
-    <p class="legenda">Nenhum barbeiro com horários disponíveis no momento.</p>
-  {% endif %}
-</section>
-{% endif %}
-
-{# Passo 3: dia e horário #}
-{% if e.barbeiro %}
 <section class="passo" id="passo-dia">
   <div class="passo__titulo">
-    <span class="passo__numero">3</span>
-    <h2 class="subtitulo">Dia e horário</h2>
+    <span class="passo__numero">2</span>
+    <h2 class="subtitulo">Dia</h2>
   </div>
   {% if e.dias %}
     <div class="dias" role="list">
       {% for d in e.dias %}
-        <a role="listitem" class="dia{% if d == e.dia %} dia--ativo{% endif %}" href="?servico={{ e.servico.pk }}&barbeiro={{ e.barbeiro.pk }}&data={{ d|date:'Y-m-d' }}#passo-dia" {% if d == e.dia %}aria-current="date"{% endif %}>
+        <a role="listitem" class="dia{% if d == e.dia %} dia--ativo{% endif %}" href="?servico={{ e.servico.pk }}{% if e.barbeiro %}&barbeiro={{ e.barbeiro.pk }}{% endif %}&data={{ d|date:'Y-m-d' }}#passo-horario" {% if d == e.dia %}aria-current="date"{% endif %}>
           <span class="dia__semana">{{ d|date:"D" }}</span>
           <span class="dia__numero">{{ d|date:"d" }}</span>
           <span class="dia__mes">{{ d|date:"M" }}</span>
         </a>
       {% endfor %}
     </div>
-    {% if e.dia %}
-      {% if e.horarios %}
+    {% if not e.dia %}<p class="legenda">Escolha um dia para ver quem está atendendo.</p>{% endif %}
+  {% else %}
+    <p class="legenda">{% if e.barbeiro %}{{ e.barbeiro.nome }} não tem{% else %}Não há{% endif %} horários livres nos próximos dias.</p>
+  {% endif %}
+</section>
+{% endif %}
+
+{# Passo 3: barbeiro e horário, lado a lado #}
+{% if e.dia %}
+<section class="passo" id="passo-horario">
+  <div class="passo__titulo">
+    <span class="passo__numero">3</span>
+    <h2 class="subtitulo">Barbeiro e horário</h2>
+  </div>
+  {% if e.opcoes %}
+    <p class="legenda">Quem está atendendo {{ e.dia|date:"l"|lower }}, {{ e.dia|date:"j" }} de {{ e.dia|date:"F"|lower }}. Toque no horário.</p>
+    {% for barbeiro, horarios in e.opcoes %}
+      <div class="barbeiro-dia">
+        <div class="barbeiro-dia__nome">
+          <span class="opcao__inicial" aria-hidden="true">{{ barbeiro.nome|first }}</span>
+          <span class="corpo-forte">{{ barbeiro.nome }}</span>
+        </div>
         <div class="horarios">
-          {% for h in e.horarios %}
-            <a class="horario{% if h == e.inicio %} horario--ativo{% endif %}" href="?servico={{ e.servico.pk }}&barbeiro={{ e.barbeiro.pk }}&data={{ e.dia|date:'Y-m-d' }}&hora={{ h|time:'H:i' }}#passo-dados">{{ h|time:"H:i" }}</a>
+          {% for h in horarios %}
+            <a class="horario{% if barbeiro == e.barbeiro and h == e.inicio %} horario--ativo{% endif %}" href="?servico={{ e.servico.pk }}&data={{ e.dia|date:'Y-m-d' }}&barbeiro={{ barbeiro.pk }}&hora={{ h|time:'H:i' }}#passo-dados" aria-label="{{ h|time:'H:i' }} com {{ barbeiro.nome }}">{{ h|time:"H:i" }}</a>
           {% endfor %}
         </div>
-      {% else %}
-        <p class="legenda">Sem horários livres neste dia. Escolha outro dia.</p>
-      {% endif %}
-    {% else %}
-      <p class="legenda">Escolha um dia para ver os horários livres.</p>
-    {% endif %}
+      </div>
+    {% endfor %}
   {% else %}
-    <p class="legenda">{{ e.barbeiro.nome }} não tem horários livres nos próximos dias.</p>
+    <p class="legenda">Ninguém com horário livre neste dia. Escolha outro dia.</p>
   {% endif %}
 </section>
 {% endif %}

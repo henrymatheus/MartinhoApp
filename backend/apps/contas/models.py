@@ -81,3 +81,27 @@ class PertenceABarbearia(models.Model):
 
     class Meta:
         abstract = True
+
+
+class InscricaoPush(models.Model):
+    """
+    Um celular (ou navegador) que aceitou receber avisos do Martinho.
+
+    Quando alguém toca em "Ativar avisos", o navegador gera um endereço
+    exclusivo (endpoint) e duas chaves de criptografia. Guardamos isso para
+    enviar a notificação depois. Uma pessoa pode ter vários aparelhos.
+    """
+
+    usuario = models.ForeignKey(Usuario, on_delete=models.CASCADE, related_name='inscricoes_push')
+    endpoint = models.URLField(max_length=500, unique=True)
+    p256dh = models.CharField(max_length=200)
+    auth = models.CharField(max_length=100)
+    navegador = models.CharField(max_length=200, blank=True)
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'aparelho com avisos'
+        verbose_name_plural = 'aparelhos com avisos'
+
+    def __str__(self):
+        return f'{self.usuario} · {self.navegador[:40] or "aparelho"}'

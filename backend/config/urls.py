@@ -11,6 +11,7 @@ urlpatterns = [
     # O sistema: a agenda é a página inicial.
     path('', include('apps.agenda.urls')),
     path('', include('apps.cadastros.urls')),
+    path('', include('apps.contas.urls')),
     # Páginas públicas (sem login): agendamento do cliente e arquivos do PWA.
     path('', include('apps.publico.urls')),
     # Login e logout prontos do Django, com o template da marca.

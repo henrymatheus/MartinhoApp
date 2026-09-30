@@ -1,7 +1,10 @@
+from datetime import datetime, time, timedelta
+
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from django.db import models
+from django.utils import timezone
 
 from apps.contas.models import PertenceABarbearia
 from apps.contas.telefones import link_whatsapp
@@ -111,28 +114,70 @@ class HorarioTrabalho(models.Model):
 
 
 class Bloqueio(models.Model):
-    """Dias em que o barbeiro não atende: folga, férias, curso etc."""
+    """
+    Período em que o barbeiro não atende: folga, férias, falta, consulta etc.
+
+    Sem horário, vale para os dias inteiros de data_inicio a data_fim.
+    Com horário (só para um único dia), vale apenas aquele trecho: por
+    exemplo "hoje, das 13:00 às 18:00" ou "saiu às 15:00".
+    """
 
     barbeiro = models.ForeignKey(Barbeiro, on_delete=models.CASCADE, related_name='bloqueios')
     data_inicio = models.DateField('de')
     data_fim = models.DateField('até')
+    hora_inicio = models.TimeField('das', null=True, blank=True)
+    hora_fim = models.TimeField('às', null=True, blank=True)
     motivo = models.CharField(max_length=80, blank=True)
 
     class Meta:
-        ordering = ['data_inicio']
-        verbose_name = 'folga ou férias'
-        verbose_name_plural = 'folgas e férias'
+        ordering = ['data_inicio', 'hora_inicio']
+        verbose_name = 'ausência'
+        verbose_name_plural = 'ausências (folgas, férias, faltas)'
         constraints = [
             models.CheckConstraint(
                 condition=models.Q(data_fim__gte=models.F('data_inicio')), name='bloqueio_fim_depois_do_inicio'
             ),
+            # Horário: os dois preenchidos (e fim depois do início) ou nenhum.
+            models.CheckConstraint(
+                condition=(
+                    models.Q(hora_inicio__isnull=True, hora_fim__isnull=True)
+                    | models.Q(hora_inicio__isnull=False, hora_fim__isnull=False, hora_fim__gt=models.F('hora_inicio'))
+                ),
+                name='bloqueio_horario_completo',
+            ),
         ]
 
     def __str__(self):
+        if self.dia_parcial:
+            return f'{self.data_inicio:%d/%m/%Y}, das {self.hora_inicio:%H:%M} às {self.hora_fim:%H:%M}'
         if self.data_inicio == self.data_fim:
             return f'{self.data_inicio:%d/%m/%Y}'
         return f'{self.data_inicio:%d/%m} a {self.data_fim:%d/%m/%Y}'
 
+    @property
+    def dia_parcial(self):
+        return self.hora_inicio is not None
+
+    def intervalo_em(self, dia):
+        """
+        O trecho (início, fim) em que o barbeiro está ausente naquele dia,
+        com fuso. Dia inteiro = da meia-noite à meia-noite seguinte.
+        """
+        if self.dia_parcial:
+            return (
+                timezone.make_aware(datetime.combine(dia, self.hora_inicio)),
+                timezone.make_aware(datetime.combine(dia, self.hora_fim)),
+            )
+        inicio = timezone.make_aware(datetime.combine(dia, time.min))
+        return inicio, timezone.make_aware(datetime.combine(dia + timedelta(days=1), time.min))
+
     def clean(self):
         if self.data_inicio and self.data_fim and self.data_fim < self.data_inicio:
             raise ValidationError({'data_fim': 'A data final precisa ser igual ou depois da inicial.'})
+        if (self.hora_inicio is None) != (self.hora_fim is None):
+            raise ValidationError('Para uma ausência de parte do dia, preencha o horário de início e o de fim.')
+        if self.dia_parcial:
+            if self.data_inicio != self.data_fim:
+                raise ValidationError('Ausência com horário vale para um único dia.')
+            if self.hora_fim <= self.hora_inicio:
+                raise ValidationError({'hora_fim': 'O fim precisa ser depois do início.'})

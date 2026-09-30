@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 
-from .models import Barbearia, Usuario
+from .models import Barbearia, InscricaoPush, Usuario
 
 
 class DaBarbeariaAdmin(admin.ModelAdmin):
@@ -60,3 +60,10 @@ class UsuarioAdmin(UserAdmin):
     list_filter = ['barbearia', 'papel', 'is_active']
     fieldsets = UserAdmin.fieldsets + (('Barbearia', {'fields': ['barbearia', 'papel']}),)
     add_fieldsets = UserAdmin.add_fieldsets + (('Barbearia', {'fields': ['barbearia', 'papel']}),)
+
+
+@admin.register(InscricaoPush)
+class InscricaoPushAdmin(admin.ModelAdmin):
+    list_display = ['usuario', 'navegador', 'criado_em']
+    list_filter = ['usuario__barbearia']
+    readonly_fields = ['usuario', 'endpoint', 'p256dh', 'auth', 'navegador', 'criado_em']
