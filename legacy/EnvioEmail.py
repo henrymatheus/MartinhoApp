@@ -1,4 +1,5 @@
 
+import os
 import sqlite3
 from datetime import date, datetime
 import smtplib
@@ -51,9 +52,9 @@ def enviar_email():
 
                     msg = email.message.Message()
                     msg['Subject'] = f"🎉 Feliz Aniversário, {nome_cliente}! Que esse dia seja muito especial para você!"
-                    msg['From'] = 'adjombarbearia6@gmail.com'
+                    msg['From'] = os.environ['EMAIL_REMETENTE']
                     msg['To'] = f'{email_cliente}'
-                    password = 'efzn szkk qsfb ykfr' 
+                    password = os.environ['EMAIL_SENHA_APP']
                     msg.add_header('Content-Type', 'text/html')
                     msg.set_payload(corpo_email)
 
