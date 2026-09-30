@@ -65,6 +65,16 @@ class AgendaDoDiaView(DaBarbeariaMixin, TemplateView):
             agora_antes_de=agora_antes_de,
             total_ativos=sum(1 for ag in agendamentos if ag.status == Agendamento.Status.AGENDADO),
         )
+        if not agendamentos:
+            # Dia vazio: mostra os próximos horários marcados, para ninguém
+            # achar que um agendamento sumiu só porque está em outro dia.
+            contexto['proximos'] = (
+                Agendamento.objects.filter(
+                    barbearia=self.barbearia, status=Agendamento.Status.AGENDADO, inicio__gte=agora
+                )
+                .select_related('cliente', 'barbeiro', 'servico')
+                .order_by('inicio')[:5]
+            )
         return contexto
 
 

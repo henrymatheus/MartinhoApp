@@ -5,7 +5,7 @@
 
 Legenda de status: ✅ pronto · 🚧 em andamento · 📋 planejado · 🗄️ legado (desktop Tkinter)
 
-Situação atual: sistema interno (agenda, clientes, histórico, horários) e agendamento online pelo cliente prontos, instaláveis como app (PWA). Faltam e-mail de aniversário, backup, servidor sempre acordado e o deploy.
+Situação atual: sistema interno (agenda, clientes, histórico, horários) e agendamento online pelo cliente prontos, instaláveis como app (PWA). No ar em https://martinhoapp.onrender.com (Render + Supabase). Faltam e-mail de aniversário, backup e servidor sempre acordado.
 
 Última atualização: 2026-09-30
 
@@ -52,7 +52,7 @@ Regras fixas:
 | 4 | Cadastro de clientes | ✅ | Tela Clientes: lista com busca por nome ou telefone, cadastro, edição e ficha |
 | 5 | Agendamento | ✅ | Novo agendamento e remarcação. Conflito de horário verificado no `save()` com trava do barbeiro (`select_for_update`); horários encostados e cancelados não conflitam; fim calculado pela duração do serviço. Ações: Concluir, Faltou, Cancelar |
 | 6 | Histórico de atendimentos por cliente | ✅ | Na ficha do cliente. "Concluir atendimento" na agenda registra o histórico com cópia do preço |
-| 7 | Agenda do dia (painel) | ✅ | Página inicial. Navegação entre dias, linha dourada "agora", marcador de aniversariante |
+| 7 | Agenda do dia (painel) | ✅ | Página inicial. Navegação entre dias, linha dourada "agora", marcador de aniversariante. Dia vazio mostra os próximos 5 horários marcados, com link para o dia |
 | 8 | E-mail de aniversário | 📋 | Management command rodado diariamente pelo GitHub Actions |
 | 9 | Login | ✅ | Sessão do Django, tela `/entrar/` com a marca |
 | 10 | Notificação ao cliente via WhatsApp (`wa.me`) | ✅ | Botão "Lembrar no WhatsApp" com mensagem pronta; telefone com DDD ganha o código 55 |
@@ -113,3 +113,5 @@ Funcionalidades existentes em `legacy/main.py`, `legacy/agendamento.py` e `legac
 | 2026-09-30 | Banco de produção no Supabase conectado e migrado. Testes sempre em SQLite; `/` redireciona ao admin; VS Code usa a venv do back-end |
 | 2026-09-30 | Telas do sistema: login, agenda do dia, novo agendamento e remarcação, clientes e ficha com histórico. Comando `dados_demo`. 30 testes |
 | 2026-09-30 | Horários de trabalho e folgas, agendamento online pelo cliente, PWA. Deploy no Render: `ALLOWED_HOSTS` automático. 54 testes |
+| 2026-09-30 | Primeiro deploy no Render (https://martinhoapp.onrender.com), banco de produção no Supabase. Corrigida a migration do `slug` no PostgreSQL |
+| 2026-09-30 | Agenda: dia sem horários mostra os próximos agendamentos (um horário marcado pelo cliente para outro dia parecia ter sumido). 55 testes |

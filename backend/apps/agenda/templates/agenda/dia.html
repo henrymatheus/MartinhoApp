@@ -59,5 +59,25 @@
     <p>Os agendamentos aparecem aqui em ordem de horário.</p>
     <a class="btn btn--primario" href="{% url 'agenda:novo' %}?data={{ dia|date:'Y-m-d' }}">Novo agendamento</a>
   </div>
+  {% if proximos %}
+    <section class="formulario">
+      <h2 class="subtitulo">Próximos horários marcados</h2>
+      <div class="tabela-rolagem">
+        <table class="tabela">
+          <thead><tr><th>Quando</th><th>Cliente</th><th>Serviço</th><th>Barbeiro</th></tr></thead>
+          <tbody>
+            {% for ag in proximos %}
+              <tr>
+                <td><a href="?data={{ ag.inicio|date:'Y-m-d' }}">{{ ag.inicio|date:"D, d/m" }} · {{ ag.inicio|time:"H:i" }}</a></td>
+                <td>{{ ag.cliente }}</td>
+                <td>{{ ag.servico.nome }}</td>
+                <td>{{ ag.barbeiro }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  {% endif %}
 {% endif %}
 {% endblock %}

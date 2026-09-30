@@ -158,6 +158,16 @@ class TelasDaAgendaTests(BaseAgenda):
         self.assertContains(resposta, 'João Pereira')
         self.assertNotContains(resposta, 'Cliente de fora')
 
+    def test_dia_vazio_mostra_proximos_horarios(self):
+        from django.utils import timezone
+
+        futuro = timezone.localtime() + timedelta(days=3)
+        futuro = futuro.replace(hour=10, minute=0, second=0, microsecond=0)
+        self.agendamento(futuro).save()
+        resposta = self.client.get('/?data=2020-01-01')
+        self.assertContains(resposta, 'Próximos horários marcados')
+        self.assertContains(resposta, f'?data={futuro.date().isoformat()}')
+
     def dados_formulario(self, **extra):
         dados = {
             'cliente': self.carlos.pk,
