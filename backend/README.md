@@ -10,8 +10,10 @@
    ```
 2. Copie `.env.example` para `.env` e preencha `DJANGO_SECRET_KEY` e `DATABASE_URL`.
 3. Tenha um PostgreSQL disponível. É obrigatório: a regra de conflito de horários usa um recurso que só o PostgreSQL tem. Duas opções:
-   - um projeto **só de desenvolvimento** no Supabase (recomendado; não use o banco de produção);
-   - o PostgreSQL instalado na máquina.
+   - o PostgreSQL local em `%LOCALAPPDATA%\Martinho\postgres` (porta 55432). Ligue antes de trabalhar:
+     `powershell -ExecutionPolicy Bypass -File scripts\banco-local.ps1 ligar`
+     (também aceita `desligar` e `status`). `DATABASE_URL=postgres://martinho@localhost:55432/postgres`;
+   - um projeto **só de desenvolvimento** no Supabase (não use o banco de produção).
 4. Crie as tabelas e um superusuário:
    ```bash
    python manage.py migrate
