@@ -16,7 +16,13 @@ from django.urls import reverse
 from django.utils import timezone
 from django.views import View
 
-from apps.agenda.disponibilidade import barbeiros_do_dia, dias_com_algum_barbeiro, esta_livre
+from apps.agenda.disponibilidade import (
+    ausente_o_dia_todo,
+    dias_com_horario,
+    esta_livre,
+    horarios_livres,
+    proximo_horario,
+)
 from apps.agenda.models import Agendamento
 from apps.cadastros.models import Barbeiro, Cliente, Servico
 from apps.contas.models import Barbearia
@@ -35,44 +41,79 @@ def barbearia_publica(slug):
     return get_object_or_404(Barbearia, slug=slug, agendamento_online=True)
 
 
+def cartoes_de_barbeiros(barbeiros, servicos):
+    """
+    Primeira tela do cliente: cada barbeiro com a situação de hoje e o próximo
+    horário livre. Como o serviço ainda não foi escolhido, o "próximo horário"
+    usa o serviço mais curto da barbearia. Quem tem horário vem primeiro.
+    """
+    hoje = timezone.localdate()
+    referencia = min(servicos, key=lambda s: s.duracao_minutos) if servicos else None
+    cartoes = []
+    for barbeiro in barbeiros:
+        dias_com_turno = {h.dia_semana for h in barbeiro.horarios.all()}
+        if ausente_o_dia_todo(barbeiro, hoje):
+            situacao = 'Ausente hoje'
+        elif hoje.weekday() in dias_com_turno:
+            situacao = 'Atendendo hoje'
+        else:
+            situacao = 'Não atende hoje'
+        proximo = proximo_horario(barbeiro, referencia) if referencia else None
+        tem_hoje = proximo is not None and timezone.localdate(proximo) == hoje
+        if situacao == 'Atendendo hoje' and not tem_hoje:
+            situacao = 'Sem horários livres hoje'
+        cartoes.append({'barbeiro': barbeiro, 'situacao': situacao, 'proximo': proximo, 'hoje': tem_hoje})
+    return sorted(cartoes, key=lambda c: (c['proximo'] is None, c['proximo'] or timezone.now()))
+
+
 def ler_escolhas(barbearia, dados):
     """
     Interpreta o que o cliente já escolheu e calcula as opções do próximo passo.
 
-    Fluxo: serviço -> dia -> barbeiros que atendem naquele dia, cada um com os
-    seus horários livres -> dados do cliente. O cliente escolhe o barbeiro e o
-    horário no mesmo toque.
+    Fluxo: barbeiro (com a situação e o próximo horário livre de cada um) ->
+    serviço -> agenda daquele barbeiro (dias e horários livres) -> dados.
 
-    O parâmetro "barbeiro" no endereço também serve de filtro: o link
-    /agendar/<barbearia>/?barbeiro=3 mostra só os horários daquele barbeiro,
-    para cada um divulgar o seu. Uma escolha inválida é ignorada.
+    O link /agendar/<barbearia>/?barbeiro=3 já abre com o barbeiro escolhido,
+    para cada um divulgar o seu. Uma escolha inválida é ignorada, e o cliente
+    volta ao passo correspondente.
     """
     servicos = list(Servico.objects.filter(barbearia=barbearia, ativo=True))
     # Só barbeiros com algum horário cadastrado aparecem para o cliente.
-    barbeiros = list(Barbeiro.objects.filter(barbearia=barbearia, ativo=True, horarios__isnull=False).distinct())
+    barbeiros = list(
+        Barbeiro.objects.filter(barbearia=barbearia, ativo=True, horarios__isnull=False)
+        .distinct()
+        .prefetch_related('horarios')
+    )
 
-    e = {'servicos': servicos, 'servico': None, 'barbeiro': None, 'dias': [], 'dia': None,
-         'opcoes': [], 'inicio': None}
-    e['servico'] = next((s for s in servicos if str(s.pk) == dados.get('servico')), None)
+    e = {'servicos': servicos, 'barbeiro': None, 'servico': None, 'cartoes': [], 'dias': [], 'dia': None,
+         'horarios': [], 'inicio': None}
     e['barbeiro'] = next((b for b in barbeiros if str(b.pk) == dados.get('barbeiro')), None)
+    if not e['barbeiro']:
+        e['cartoes'] = cartoes_de_barbeiros(barbeiros, servicos)
+        return e
+
+    e['servico'] = next((s for s in servicos if str(s.pk) == dados.get('servico')), None)
     if not e['servico']:
         return e
 
-    candidatos = [e['barbeiro']] if e['barbeiro'] else barbeiros
-    e['dias'] = dias_com_algum_barbeiro(candidatos)
+    e['dias'] = dias_com_horario(e['barbeiro'], e['servico'])
     try:
-        dia = date.fromisoformat(dados.get('data', ''))
+        pedido = date.fromisoformat(dados.get('data', ''))
     except ValueError:
-        dia = None
-    if dia not in e['dias']:
+        pedido = None
+    # Sem dia escolhido (ou com um dia que não tem mais horário), a agenda
+    # abre no primeiro dia com horário livre.
+    e['dia'] = pedido if pedido in e['dias'] else (e['dias'][0] if e['dias'] else None)
+    if not e['dia']:
         return e
 
-    e['dia'] = dia
-    e['opcoes'] = barbeiros_do_dia(candidatos, e['servico'], dia)
-    if e['barbeiro']:
+    e['horarios'] = horarios_livres(e['barbeiro'], e['servico'], e['dia'])
+    # O horário só vale para o dia que o cliente escolheu. Se aquele dia não
+    # está mais disponível, o horário é descartado, para nunca agendar num
+    # dia diferente do que o cliente viu.
+    if e['dia'] == pedido:
         hora = dados.get('hora', '')
-        livres = next((h for b, h in e['opcoes'] if b == e['barbeiro']), [])
-        e['inicio'] = next((h for h in livres if timezone.localtime(h).strftime('%H:%M') == hora), None)
+        e['inicio'] = next((h for h in e['horarios'] if timezone.localtime(h).strftime('%H:%M') == hora), None)
     return e
 
 

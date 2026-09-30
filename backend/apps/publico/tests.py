@@ -104,7 +104,8 @@ class AgendamentoPeloClienteTests(Base):
         self.assertEqual(self.barbearia.slug, 'barbearia-do-joao')
 
     def test_passos_aparecem_conforme_as_escolhas(self):
-        self.assertContains(self.client.get(self.url()), 'Corte')
+        self.assertContains(self.client.get(self.url()), 'Ricardo')
+        self.assertContains(self.client.get(self.url(barbeiro=self.ricardo.pk)), 'Corte')
         resposta = self.client.get(self.url(servico=self.corte.pk, barbeiro=self.ricardo.pk, data=self.quinta.isoformat()))
         self.assertContains(resposta, '09:00')
         self.assertContains(resposta, '14:30')

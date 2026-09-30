@@ -225,11 +225,13 @@ p { margin: 0; }
 .horario:hover { background: var(--superficie-destaque); border-color: var(--azul); }
 .horario--ativo { background: var(--azul); border-color: var(--azul); color: var(--sobre-azul); }
 
-.filtro { background: var(--superficie-destaque); border-radius: var(--raio-md); padding: var(--espaco-3) var(--espaco-4); }
-.barbeiro-dia { display: flex; flex-direction: column; gap: var(--espaco-2); padding-top: var(--espaco-3); border-top: 1px solid var(--linha); }
-.barbeiro-dia__nome { display: flex; align-items: center; gap: var(--espaco-3); }
-.barbeiro-dia .opcao__inicial { width: 36px; height: 36px; font-size: 17px; }
 .corpo-forte { font-weight: 600; }
+.opcao--barbeiro { padding: var(--espaco-3); }
+.opcao__textos { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.opcao__situacao { font: 500 13px/18px var(--font-texto); color: var(--texto-suave); }
+.opcao__situacao--hoje { color: var(--sucesso); }
+.opcao--indisponivel { opacity: .6; cursor: default; }
+.opcao--indisponivel:hover { background: transparent; border-color: var(--linha-forte); }
 .resumo { background: var(--superficie-destaque); border-radius: var(--raio-md); padding: var(--espaco-3) var(--espaco-4); display: flex; flex-direction: column; gap: var(--espaco-1); }
 .confirmado { align-items: flex-start; }
 .confirmado__marca { width: 48px; height: 2px; background: var(--dourado); }

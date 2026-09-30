@@ -79,30 +79,44 @@ class DisponibilidadeComAusenciaTests(Base):
 
 
 class PaginaDoClienteTests(Base):
-    """Fluxo: serviço -> dia -> barbeiros que atendem naquele dia."""
+    """Fluxo: barbeiro (com situação e próximo horário) -> serviço -> agenda dele -> dados."""
 
     def setUp(self):
         self.dia = proxima_quinta()
 
     def pagina(self, **params):
-        query = '&'.join(f'{k}={v}' for k, v in {'servico': self.corte.pk, **params}.items())
+        query = '&'.join(f'{k}={v}' for k, v in params.items())
         return self.client.get(f'/agendar/{self.barbearia.slug}/?{query}').content.decode()
 
-    def test_mostra_todos_que_atendem_no_dia(self):
-        html = self.pagina(data=self.dia.isoformat())
+    def test_primeira_tela_mostra_os_barbeiros_com_o_proximo_horario(self):
+        html = self.pagina()
         self.assertIn('Ricardo', html)
         self.assertIn('Paulo', html)
+        self.assertIn('próximo horário', html)
 
-    def test_ausente_nao_aparece_no_dia(self):
+    def test_ausente_hoje_aparece_como_ausente(self):
+        hoje = timezone.localdate()
+        Bloqueio.objects.create(barbeiro=self.paulo, data_inicio=hoje, data_fim=hoje, motivo='Falta')
+        html = self.pagina()
+        self.assertIn('Ausente hoje', html)
+
+    def test_ausente_no_dia_nao_tem_esse_dia_na_agenda(self):
         Bloqueio.objects.create(barbeiro=self.paulo, data_inicio=self.dia, data_fim=self.dia, motivo='Falta')
-        html = self.pagina(data=self.dia.isoformat())
-        self.assertIn('Ricardo', html)
-        self.assertNotIn('Paulo', html)
+        html = self.pagina(barbeiro=self.paulo.pk, servico=self.corte.pk)
+        self.assertNotIn(f'data={self.dia.isoformat()}', html)
+        html = self.pagina(barbeiro=self.ricardo.pk, servico=self.corte.pk)
+        self.assertIn(f'data={self.dia.isoformat()}', html)
 
-    def test_link_do_barbeiro_filtra_a_pagina(self):
-        html = self.pagina(data=self.dia.isoformat(), barbeiro=self.ricardo.pk)
-        self.assertIn('Horários de <strong>Ricardo</strong>', html)
-        self.assertNotIn('>Paulo<', html)
+    def test_agenda_abre_no_primeiro_dia_com_horario(self):
+        html = self.pagina(barbeiro=self.ricardo.pk, servico=self.corte.pk)
+        self.assertIn('Agenda de Ricardo', html)
+        self.assertIn('dia--ativo', html)
+        self.assertIn('class="horario"', html)
+
+    def test_link_pessoal_do_barbeiro_pula_a_escolha(self):
+        html = self.pagina(barbeiro=self.ricardo.pk)
+        self.assertIn('passo__escolha">Ricardo', html)
+        self.assertIn('id="passo-servico"', html)
 
     def test_nao_agenda_com_barbeiro_ausente(self):
         Bloqueio.objects.create(barbeiro=self.paulo, data_inicio=self.dia, data_fim=self.dia)

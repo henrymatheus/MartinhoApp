@@ -102,22 +102,15 @@ def esta_livre(barbeiro, servico, inicio, agora=None):
     return inicio in horarios_livres(barbeiro, servico, dia, agora)
 
 
-def dias_com_algum_barbeiro(barbeiros, a_partir_de=None):
-    """Dias em que pelo menos um dos barbeiros atende, em ordem."""
-    dias = set()
-    for barbeiro in barbeiros:
-        dias.update(dias_de_atendimento(barbeiro, a_partir_de))
-    return sorted(dias)
+def dias_com_horario(barbeiro, servico, agora=None):
+    """Dias (dos próximos DIAS_A_FRENTE) em que o barbeiro ainda tem horário livre para o serviço."""
+    return [dia for dia in dias_de_atendimento(barbeiro) if horarios_livres(barbeiro, servico, dia, agora)]
 
 
-def barbeiros_do_dia(barbeiros, servico, dia, agora=None):
-    """
-    Os barbeiros que têm horário livre naquele dia, cada um com a sua lista
-    de horários. Quem está ausente ou com a agenda cheia não entra.
-    """
-    resultado = []
-    for barbeiro in barbeiros:
+def proximo_horario(barbeiro, servico, agora=None):
+    """O primeiro horário livre do barbeiro para o serviço, ou None se não houver nos próximos dias."""
+    for dia in dias_de_atendimento(barbeiro):
         livres = horarios_livres(barbeiro, servico, dia, agora)
         if livres:
-            resultado.append((barbeiro, livres))
-    return resultado
+            return livres[0]
+    return None
