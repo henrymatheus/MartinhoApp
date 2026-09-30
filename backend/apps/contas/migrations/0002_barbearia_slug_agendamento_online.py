@@ -31,11 +31,15 @@ class Migration(migrations.Migration):
             field=models.BooleanField(default=True, help_text='Permite que clientes agendem pela página pública.', verbose_name='agendamento online'),
         ),
         # Em três passos, para funcionar com barbearias já cadastradas:
-        # 1) cria o campo sem a regra de único; 2) preenche; 3) liga a regra.
+        # 1) cria o campo sem a regra de único e sem índice; 2) preenche;
+        # 3) liga a regra de único, que também cria o índice.
+        # O db_index=False do passo 1 evita um erro do Django no PostgreSQL:
+        # o SlugField já nasce com índice (mais um índice "_like" para buscas
+        # de texto), e o passo 3 tentaria criar o "_like" de novo.
         migrations.AddField(
             model_name='barbearia',
             name='slug',
-            field=models.SlugField(blank=True, max_length=60, verbose_name='endereço da página'),
+            field=models.SlugField(blank=True, db_index=False, max_length=60, verbose_name='endereço da página'),
         ),
         migrations.RunPython(preencher_slugs, migrations.RunPython.noop),
         migrations.AlterField(
