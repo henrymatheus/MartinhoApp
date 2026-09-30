@@ -1,0 +1,36 @@
+{% load static %}<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>{% block titulo %}Agendar{% endblock %} · {{ barbearia.nome }}</title>
+  <meta name="theme-color" content="#0e2240">
+  <link rel="manifest" href="{% url 'publico:manifesto_barbearia' barbearia.slug %}">
+  <link rel="icon" href="{% static 'img/martinho-simbolo.svg' %}" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="{% static 'img/icone-180.png' %}">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,700&family=Figtree:wght@400;500;600&display=swap">
+  <link rel="stylesheet" href="{% static 'css/tokens.css' %}">
+  <link rel="stylesheet" href="{% static 'css/martinho.css' %}">
+</head>
+<body class="publico">
+  <header class="publico__topo">
+    <div class="publico__conteudo">
+      <span class="rotulo publico__rotulo">Agendamento online</span>
+      <h1 class="publico__nome">{{ barbearia.nome }}</h1>
+      {% if barbearia.endereco %}<p class="publico__endereco">{{ barbearia.endereco }}</p>{% endif %}
+    </div>
+  </header>
+  <main class="publico__conteudo publico__principal">
+    {% block conteudo %}{% endblock %}
+  </main>
+  <footer class="publico__rodape">
+    <img src="{% static 'img/martinho-simbolo.svg' %}" alt="" width="20" height="20">
+    <span>Agendamento pelo Martinho</span>
+  </footer>
+  <script>
+    if ('serviceWorker' in navigator) { navigator.serviceWorker.register('{% url "publico:service_worker" %}'); }
+  </script>
+</body>
+</html>

@@ -1,0 +1,73 @@
+{% extends 'base.html' %}
+{% block titulo %}Horários de {{ barbeiro }}{% endblock %}
+{% block conteudo %}
+<div class="cabecalho">
+  <div class="cabecalho__textos">
+    <a class="legenda" href="{% url 'cadastros:horarios' %}">Horários</a>
+    <h1 class="titulo">{{ barbeiro }}</h1>
+    <p class="legenda">Marque os dias em que atende. A tarde é opcional: o intervalo entre manhã e tarde é o almoço.</p>
+  </div>
+</div>
+
+<form class="cartao formulario" method="post" novalidate>
+  {% csrf_token %}
+  <input type="hidden" name="acao" value="semana">
+  {% if semana.errors %}
+    <div class="erro-geral">
+      {% for campo in semana %}{% for erro in campo.errors %}{{ erro }}<br>{% endfor %}{% endfor %}
+    </div>
+  {% endif %}
+  <div class="tabela-rolagem">
+    <table class="tabela tabela--semana">
+      <thead>
+        <tr><th>Dia</th><th>Manhã</th><th>Tarde <span class="legenda">(opcional)</span></th></tr>
+      </thead>
+      <tbody>
+        {% for dia in semana.dias %}
+          <tr>
+            <td><label class="marcar">{{ dia.ativo }} {{ dia.ativo.label }}</label></td>
+            {% for inicio, fim in dia.turnos %}
+              <td><div class="turno">{{ inicio }}<span aria-hidden="true">às</span>{{ fim }}</div></td>
+            {% endfor %}
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="linha-acoes"><button class="btn btn--primario" type="submit">Salvar horários</button></div>
+</form>
+
+<section class="formulario">
+  <h2 class="subtitulo">Folgas e férias</h2>
+  <p class="legenda">Nesses dias o barbeiro não aparece para os clientes. Agendamentos já marcados não são cancelados.</p>
+  {% if folgas %}
+    <div class="tabela-rolagem">
+      <table class="tabela">
+        <thead><tr><th>Período</th><th>Motivo</th><th></th></tr></thead>
+        <tbody>
+          {% for f in folgas %}
+            <tr>
+              <td>{{ f }}</td>
+              <td>{{ f.motivo|default:"—" }}</td>
+              <td class="numero">
+                <form method="post" action="{% url 'cadastros:remover_folga' barbeiro.pk f.pk %}">{% csrf_token %}<button class="btn btn--texto btn--pequeno" type="submit">Remover</button></form>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+  <form class="cartao formulario" method="post" novalidate>
+    {% csrf_token %}
+    <input type="hidden" name="acao" value="folga">
+    {% for erro in folga.non_field_errors %}<p class="erro-geral">{{ erro }}</p>{% endfor %}
+    <div class="formulario__grade">
+      {% include 'includes/campo.html' with campo=folga.data_inicio %}
+      {% include 'includes/campo.html' with campo=folga.data_fim %}
+      {% include 'includes/campo.html' with campo=folga.motivo %}
+    </div>
+    <div class="linha-acoes"><button class="btn btn--secundario" type="submit">Adicionar folga</button></div>
+  </form>
+</section>
+{% endblock %}

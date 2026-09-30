@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+{% block titulo %}{% if object %}Remarcar{% else %}Novo agendamento{% endif %}{% endblock %}
+{% block classe_pagina %}pagina--estreita{% endblock %}
+{% block conteudo %}
+<div class="cabecalho">
+  <div class="cabecalho__textos">
+    <h1 class="titulo">{% if object %}Remarcar horário{% else %}Novo agendamento{% endif %}</h1>
+    {% if object %}<p class="legenda">{{ object.cliente }}</p>{% endif %}
+  </div>
+</div>
+<form class="cartao formulario" method="post" novalidate>
+  {% csrf_token %}
+  {% for erro in form.non_field_errors %}<p class="erro-geral">{{ erro }}</p>{% endfor %}
+  {% include 'includes/campo.html' with campo=form.cliente %}
+  <p class="legenda">Cliente novo? <a href="{% url 'cadastros:novo_cliente' %}">Cadastre primeiro</a> e volte para agendar.</p>
+  <div class="formulario__grade">
+    {% include 'includes/campo.html' with campo=form.data %}
+    {% include 'includes/campo.html' with campo=form.hora %}
+  </div>
+  {% include 'includes/campo.html' with campo=form.barbeiro %}
+  {% include 'includes/campo.html' with campo=form.servico %}
+  {% include 'includes/campo.html' with campo=form.observacoes %}
+  <div class="linha-acoes">
+    <button class="btn btn--primario" type="submit">{% if object %}Salvar{% else %}Agendar{% endif %}</button>
+    <a class="btn btn--secundario" href="{% url 'agenda:dia' %}">Voltar</a>
+  </div>
+</form>
+{% endblock %}

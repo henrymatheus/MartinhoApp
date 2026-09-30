@@ -1,0 +1,6 @@
+{
+  // Faz o VS Code usar a venv do back-end: no editor e em todo terminal novo.
+  "python.defaultInterpreterPath": "${workspaceFolder}/backend/.venv/Scripts/python.exe",
+  "python.terminal.activateEnvironment": true,
+  "terminal.integrated.cwd": "${workspaceFolder}/backend"
+}

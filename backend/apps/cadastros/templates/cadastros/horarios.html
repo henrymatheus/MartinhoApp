@@ -1,0 +1,63 @@
+{% extends 'base.html' %}
+{% block titulo %}Horários{% endblock %}
+{% block conteudo %}
+<div class="cabecalho">
+  <div class="cabecalho__textos">
+    <h1 class="titulo">Horários de atendimento</h1>
+    <p class="legenda">Os clientes só conseguem agendar dentro destes horários.</p>
+  </div>
+</div>
+
+<section class="cartao formulario">
+  <div class="cabecalho__textos">
+    <h2 class="subtitulo">Página de agendamento</h2>
+    {% if user.barbearia.agendamento_online %}
+      <p class="legenda">Envie este link aos clientes ou coloque na bio do Instagram. Pelo celular, dá para instalar a página como app.</p>
+    {% else %}
+      <p class="legenda">O agendamento online está desligado. Ligue na administração, em Barbearias.</p>
+    {% endif %}
+  </div>
+  <div class="linha-acoes">
+    <input class="campo-copiar" id="link-publico" value="{{ link_publico }}" readonly aria-label="Link da página de agendamento">
+    <button class="btn btn--secundario" type="button" data-copiar="link-publico">Copiar link</button>
+    <a class="btn btn--secundario" href="{{ link_publico }}" target="_blank" rel="noopener">Abrir</a>
+  </div>
+</section>
+
+{% if barbeiros %}
+  <div class="tabela-rolagem">
+    <table class="tabela">
+      <thead><tr><th>Barbeiro</th><th>Dias e horários</th><th></th></tr></thead>
+      <tbody>
+        {% for b in barbeiros %}
+          <tr>
+            <td><a href="{% url 'cadastros:horarios_barbeiro' b.pk %}">{{ b.nome }}</a></td>
+            <td>
+              {% for h in b.horarios.all %}{{ h }}{% if not forloop.last %}<br>{% endif %}{% empty %}<span class="legenda">Sem horários: não aparece para os clientes</span>{% endfor %}
+            </td>
+            <td class="numero"><a class="btn btn--secundario btn--pequeno" href="{% url 'cadastros:horarios_barbeiro' b.pk %}">Editar</a></td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% else %}
+  <div class="cartao vazio">
+    <p class="subtitulo">Nenhum barbeiro ativo</p>
+    <p>Cadastre os barbeiros na administração, em Barbeiros.</p>
+  </div>
+{% endif %}
+
+<script>
+  document.querySelectorAll('[data-copiar]').forEach(function (botao) {
+    botao.addEventListener('click', function () {
+      var campo = document.getElementById(botao.dataset.copiar);
+      campo.select();
+      (navigator.clipboard ? navigator.clipboard.writeText(campo.value) : Promise.reject()).then(
+        function () { botao.textContent = 'Copiado'; },
+        function () { document.execCommand('copy'); botao.textContent = 'Copiado'; }
+      );
+    });
+  });
+</script>
+{% endblock %}

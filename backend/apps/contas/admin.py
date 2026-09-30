@@ -50,7 +50,7 @@ class DaBarbeariaAdmin(admin.ModelAdmin):
 
 @admin.register(Barbearia)
 class BarbeariaAdmin(admin.ModelAdmin):
-    list_display = ['nome', 'telefone', 'criado_em']
+    list_display = ['nome', 'slug', 'telefone', 'agendamento_online', 'criado_em']
     search_fields = ['nome']
 
 

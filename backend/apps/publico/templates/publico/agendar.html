@@ -1,0 +1,120 @@
+{% extends 'publico/base_publica.html' %}
+{% block conteudo %}
+
+{# Passo 1: serviço #}
+<section class="passo" id="passo-servico">
+  <div class="passo__titulo">
+    <span class="passo__numero">1</span>
+    <h2 class="subtitulo">Serviço</h2>
+    {% if e.servico %}<a class="passo__trocar" href="?#passo-servico">Trocar</a>{% endif %}
+  </div>
+  {% if e.servico %}
+    <p class="passo__escolha">{{ e.servico.nome }} · {{ e.servico.duracao_minutos }} min · R$ {{ e.servico.preco }}</p>
+  {% elif e.servicos %}
+    <ul class="opcoes">
+      {% for s in e.servicos %}
+        <li><a class="opcao" href="?servico={{ s.pk }}#passo-barbeiro">
+          <span class="opcao__nome">{{ s.nome }}</span>
+          <span class="opcao__detalhe">{{ s.duracao_minutos }} min</span>
+          <span class="opcao__preco">R$ {{ s.preco }}</span>
+        </a></li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="legenda">A barbearia ainda não cadastrou serviços para agendamento online.</p>
+  {% endif %}
+</section>
+
+{# Passo 2: barbeiro #}
+{% if e.servico %}
+<section class="passo" id="passo-barbeiro">
+  <div class="passo__titulo">
+    <span class="passo__numero">2</span>
+    <h2 class="subtitulo">Barbeiro</h2>
+    {% if e.barbeiro %}<a class="passo__trocar" href="?servico={{ e.servico.pk }}#passo-barbeiro">Trocar</a>{% endif %}
+  </div>
+  {% if e.barbeiro %}
+    <p class="passo__escolha">{{ e.barbeiro.nome }}</p>
+  {% elif e.barbeiros %}
+    <ul class="opcoes opcoes--grade">
+      {% for b in e.barbeiros %}
+        <li><a class="opcao opcao--centro" href="?servico={{ e.servico.pk }}&barbeiro={{ b.pk }}#passo-dia">
+          <span class="opcao__inicial" aria-hidden="true">{{ b.nome|first }}</span>
+          <span class="opcao__nome">{{ b.nome }}</span>
+        </a></li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="legenda">Nenhum barbeiro com horários disponíveis no momento.</p>
+  {% endif %}
+</section>
+{% endif %}
+
+{# Passo 3: dia e horário #}
+{% if e.barbeiro %}
+<section class="passo" id="passo-dia">
+  <div class="passo__titulo">
+    <span class="passo__numero">3</span>
+    <h2 class="subtitulo">Dia e horário</h2>
+  </div>
+  {% if e.dias %}
+    <div class="dias" role="list">
+      {% for d in e.dias %}
+        <a role="listitem" class="dia{% if d == e.dia %} dia--ativo{% endif %}" href="?servico={{ e.servico.pk }}&barbeiro={{ e.barbeiro.pk }}&data={{ d|date:'Y-m-d' }}#passo-dia" {% if d == e.dia %}aria-current="date"{% endif %}>
+          <span class="dia__semana">{{ d|date:"D" }}</span>
+          <span class="dia__numero">{{ d|date:"d" }}</span>
+          <span class="dia__mes">{{ d|date:"M" }}</span>
+        </a>
+      {% endfor %}
+    </div>
+    {% if e.dia %}
+      {% if e.horarios %}
+        <div class="horarios">
+          {% for h in e.horarios %}
+            <a class="horario{% if h == e.inicio %} horario--ativo{% endif %}" href="?servico={{ e.servico.pk }}&barbeiro={{ e.barbeiro.pk }}&data={{ e.dia|date:'Y-m-d' }}&hora={{ h|time:'H:i' }}#passo-dados">{{ h|time:"H:i" }}</a>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="legenda">Sem horários livres neste dia. Escolha outro dia.</p>
+      {% endif %}
+    {% else %}
+      <p class="legenda">Escolha um dia para ver os horários livres.</p>
+    {% endif %}
+  {% else %}
+    <p class="legenda">{{ e.barbeiro.nome }} não tem horários livres nos próximos dias.</p>
+  {% endif %}
+</section>
+{% endif %}
+
+{# Passo 4: dados do cliente #}
+{% if e.inicio or form.non_field_errors %}
+<section class="passo" id="passo-dados">
+  <div class="passo__titulo">
+    <span class="passo__numero">4</span>
+    <h2 class="subtitulo">Seus dados</h2>
+  </div>
+  {% for erro in form.non_field_errors %}<p class="erro-geral">{{ erro }}</p>{% endfor %}
+  {% if e.inicio %}
+    <div class="resumo">
+      <p><strong>{{ e.servico.nome }}</strong> com {{ e.barbeiro.nome }}</p>
+      <p>{{ e.inicio|date:"l" }}, {{ e.inicio|date:"j" }} de {{ e.inicio|date:"F"|lower }} às <strong>{{ e.inicio|time:"H:i" }}</strong></p>
+    </div>
+    <form class="formulario" method="post" novalidate>
+      {% csrf_token %}
+      <input type="hidden" name="servico" value="{{ e.servico.pk }}">
+      <input type="hidden" name="barbeiro" value="{{ e.barbeiro.pk }}">
+      <input type="hidden" name="data" value="{{ e.dia|date:'Y-m-d' }}">
+      <input type="hidden" name="hora" value="{{ e.inicio|time:'H:i' }}">
+      {{ form.site }}
+      {% include 'includes/campo.html' with campo=form.nome %}
+      {% include 'includes/campo.html' with campo=form.telefone %}
+      <button class="btn btn--primario" type="submit">Confirmar agendamento</button>
+    </form>
+  {% endif %}
+</section>
+{% endif %}
+
+{% if barbearia.telefone %}
+  <p class="legenda publico__contato">Dúvidas? Fale com a barbearia: {{ barbearia.telefone }}</p>
+{% endif %}
+{% endblock %}

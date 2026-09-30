@@ -1,13 +1,23 @@
 from django.contrib.auth.models import AbstractUser
 from django.db import models
+from django.utils.text import slugify
+
+from .telefones import link_whatsapp
 
 
 class Barbearia(models.Model):
     """Cada barbearia cliente do Martinho. Todo dado do sistema pertence a uma."""
 
     nome = models.CharField(max_length=120)
-    telefone = models.CharField(max_length=20, blank=True)
+    # Parte do endereço da página de agendamento: /agendar/<slug>/.
+    # Gerado a partir do nome na primeira gravação ("Barbearia do João" ->
+    # "barbearia-do-joao") e pode ser trocado no admin.
+    slug = models.SlugField('endereço da página', max_length=60, unique=True, blank=True)
+    telefone = models.CharField(max_length=20, blank=True, help_text='Aparece na página de agendamento para contato.')
     endereco = models.CharField('endereço', max_length=255, blank=True)
+    agendamento_online = models.BooleanField(
+        'agendamento online', default=True, help_text='Permite que clientes agendem pela página pública.'
+    )
     criado_em = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -15,6 +25,21 @@ class Barbearia(models.Model):
 
     def __str__(self):
         return self.nome
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            self.slug = self.gerar_slug()
+        super().save(*args, **kwargs)
+
+    def gerar_slug(self):
+        base = slugify(self.nome)[:50] or 'barbearia'
+        slug, n = base, 2
+        while Barbearia.objects.filter(slug=slug).exclude(pk=self.pk).exists():
+            slug, n = f'{base}-{n}', n + 1
+        return slug
+
+    def link_whatsapp(self, mensagem=''):
+        return link_whatsapp(self.telefone, mensagem)
 
 
 class Usuario(AbstractUser):

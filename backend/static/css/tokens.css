@@ -1,0 +1,70 @@
+/* Gerado a partir de docs/marca/tokens.json. Não edite à mão: altere o tokens.json. */
+:root {
+  --fundo: #f5f7fb;
+  --superficie: #ffffff;
+  --superficie-elevada: #ffffff;
+  --superficie-destaque: #e8eef8;
+  --linha: #d5ddea;
+  --linha-forte: #75839e;
+  --texto: #0e2240;
+  --texto-suave: #4b5a78;
+  --azul: #1b3a6b;
+  --azul-hover: #142e57;
+  --sobre-azul: #ffffff;
+  --marinho: #0e2240;
+  --dourado: #c29a45;
+  --dourado-texto: #8a6a22;
+  --sobre-dourado: #0e2240;
+  --sucesso: #1e6b45;
+  --sucesso-fundo: #e3f2ea;
+  --alerta: #8f5200;
+  --alerta-fundo: #fbefd9;
+  --perigo: #b3261e;
+  --perigo-fundo: #fbe6e4;
+  --neutro-fundo: #edf0f5;
+  --foco: #1b3a6b;
+  --sombra-cartao: 0 1px 2px rgba(14, 34, 64, 0.06);
+  --sombra-flutuante: 0 8px 24px rgba(14, 34, 64, 0.14);
+  --espaco-1: 4px;
+  --espaco-2: 8px;
+  --espaco-3: 12px;
+  --espaco-4: 16px;
+  --espaco-6: 24px;
+  --espaco-8: 32px;
+  --raio-sm: 4px;
+  --raio-md: 8px;
+  --raio-pilula: 999px;
+  --font-marca: "Bodoni Moda", "Didot", "Bodoni 72", Georgia, serif;
+  --font-texto: "Figtree", "Segoe UI", system-ui, -apple-system, sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+  --fundo: #0a1628;
+  --superficie: #111f36;
+  --superficie-elevada: #172a47;
+  --superficie-destaque: #1b3358;
+  --linha: #26395a;
+  --linha-forte: #5e7396;
+  --texto: #eef2f8;
+  --texto-suave: #a9b6cc;
+  --azul: #8db0e6;
+  --azul-hover: #a6c2ee;
+  --sobre-azul: #0a1628;
+  --marinho: #1b3a6b;
+  --dourado: #d4ae5e;
+  --dourado-texto: #d9b464;
+  --sobre-dourado: #0a1628;
+  --sucesso: #6cc79a;
+  --sucesso-fundo: #12321f;
+  --alerta: #f0b35a;
+  --alerta-fundo: #3a2a0f;
+  --perigo: #ff8a80;
+  --perigo-fundo: #3d1614;
+  --neutro-fundo: #1e2b42;
+  --foco: #d4ae5e;
+  --sombra-cartao: none;
+  --sombra-flutuante: 0 8px 24px rgba(0, 0, 0, 0.5);
+    color-scheme: dark;
+  }
+}
