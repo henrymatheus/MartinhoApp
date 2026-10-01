@@ -19,6 +19,7 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
       </a>
     </nav>
+    <a class="btn btn--secundario" href="{% url 'agenda:registrar_atendimento' %}">Sem hora marcada</a>
     <a class="btn btn--primario" href="{% url 'agenda:novo' %}?data={{ dia|date:'Y-m-d' }}">Novo agendamento</a>
   </div>
 </div>

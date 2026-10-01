@@ -8,6 +8,9 @@ urlpatterns = [
     path('', views.AgendaDoDiaView.as_view(), name='dia'),
     path('agendamentos/novo/', views.NovoAgendamentoView.as_view(), name='novo'),
     path('agendamentos/<int:pk>/editar/', views.EditarAgendamentoView.as_view(), name='editar'),
+    path('balanco/', views.BalancoView.as_view(), name='balanco'),
+    path('balanco/exportar/', views.ExportarBalancoView.as_view(), name='exportar_balanco'),
+    path('atendimentos/novo/', views.RegistrarAtendimentoView.as_view(), name='registrar_atendimento'),
     path('ausencias/barbeiro/<int:pk>/marcar/', views.MarcarAusenciaView.as_view(), name='marcar_ausencia'),
     path('ausencias/<int:pk>/desfazer/', views.DesfazerAusenciaView.as_view(), name='desfazer_ausencia'),
     path(

@@ -9,6 +9,7 @@
   <div class="linha-acoes">
     {% if whatsapp %}<a class="btn btn--secundario" href="{{ whatsapp }}" target="_blank" rel="noopener">WhatsApp</a>{% endif %}
     <a class="btn btn--secundario" href="{% url 'cadastros:editar_cliente' cliente.pk %}">Editar</a>
+    <a class="btn btn--secundario" href="{% url 'agenda:registrar_atendimento' %}?cliente={{ cliente.pk }}">Registrar atendimento</a>
     <a class="btn btn--primario" href="{% url 'agenda:novo' %}?cliente={{ cliente.pk }}">Agendar</a>
   </div>
 </div>

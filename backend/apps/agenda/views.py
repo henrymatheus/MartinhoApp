@@ -1,20 +1,24 @@
+import csv
 from datetime import date, time, timedelta
+from urllib.parse import urlencode
 
 from django.contrib import messages
 from django.core.exceptions import ValidationError
-from django.http import Http404
+from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
 from django.utils import timezone
 from django.views import View
-from django.views.generic import CreateView, TemplateView, UpdateView
+from django.views.generic import CreateView, FormView, TemplateView, UpdateView
 
 from apps.cadastros.models import Barbeiro, Bloqueio
 from apps.cadastros.views import barbeiros_visiveis
+from apps.contas.models import Usuario
 from apps.contas.views import DaBarbeariaMixin
 
+from .balanco import Periodo, atendimentos_do_periodo, barbeiros_do_balanco, calcular, lista_detalhada, mes_anterior
 from .disponibilidade import ausente_em, sobrepoe
-from .forms import AgendamentoForm
+from .forms import AgendamentoForm, AtendimentoAvulsoForm
 from .models import Agendamento
 
 
@@ -247,3 +251,168 @@ class MudarStatusView(DaBarbeariaMixin, View):
         except ValidationError as erro:
             messages.error(request, ' '.join(erro.messages))
         return redirect(url_do_dia(timezone.localdate(ag.inicio)))
+
+
+class EscopoDoBalancoMixin(DaBarbeariaMixin):
+    """
+    Decide de quem é o balanço que a tela mostra.
+
+    O barbeiro sempre vê o próprio: o ?barbeiro= da URL é ignorado para ele,
+    então não adianta trocar o número para ver o de um colega. O dono vê
+    todos juntos ou escolhe um barbeiro.
+    """
+
+    def dispatch(self, request, *args, **kwargs):
+        if request.user.is_authenticated and request.user.barbearia_id:
+            self.permitidos = barbeiros_do_balanco(request.user)
+            self.eh_barbeiro = request.user.papel == Usuario.Papel.BARBEIRO
+            self.barbeiro = None
+            if self.eh_barbeiro:
+                self.barbeiro = self.permitidos.first()
+            elif request.GET.get('barbeiro', '').isdigit():
+                self.barbeiro = get_object_or_404(self.permitidos, pk=request.GET['barbeiro'])
+        return super().dispatch(request, *args, **kwargs)
+
+    @property
+    def sem_vinculo(self):
+        """Login com papel barbeiro que não está ligado a uma ficha de barbeiro."""
+        return self.eh_barbeiro and self.barbeiro is None
+
+    def url_com(self, nome_url, periodo, barbeiro=None):
+        parametros = periodo.parametros()
+        barbeiro = barbeiro or self.barbeiro
+        if barbeiro is not None and not self.eh_barbeiro:
+            parametros['barbeiro'] = barbeiro.pk
+        return f'{reverse(nome_url)}?{urlencode(parametros)}'
+
+
+class BalancoView(EscopoDoBalancoMixin, TemplateView):
+    """
+    Painel de atendimentos do período: quantidade, gráfico por dia,
+    comparação com o período anterior, estatísticas, resumo por barbeiro
+    (para o dono) e a lista de atendimentos dia a dia. Sem valores em
+    dinheiro por enquanto.
+    """
+
+    template_name = 'agenda/balanco.html'
+    secao = 'balanco'
+
+    def get_context_data(self, **kwargs):
+        contexto = super().get_context_data(**kwargs)
+        hoje = timezone.localdate()
+        periodo = Periodo.da_requisicao(self.request.GET, hoje)
+        contexto.update(
+            periodo=periodo,
+            hoje=hoje,
+            eh_barbeiro=self.eh_barbeiro,
+            barbeiro=self.barbeiro,
+            barbeiros=self.permitidos,
+            atalhos=self.atalhos(periodo, hoje),
+            url_anterior=self.url_com('agenda:balanco', periodo.deslocar(-1)),
+            url_proximo=self.url_com('agenda:balanco', periodo.deslocar(1)),
+            # Não há atendimento no futuro: a seta "próximo" para no período atual.
+            tem_proximo=periodo.fim < hoje,
+            url_exportar=self.url_com('agenda:exportar_balanco', periodo),
+        )
+        if self.sem_vinculo:
+            # Não há o que mostrar; a tela explica o que fazer.
+            contexto['sem_vinculo'] = True
+            return contexto
+        resultado = calcular(self.barbearia, periodo, hoje, self.barbeiro)
+        if resultado['grafico']:
+            # Tocar numa barra abre o balanço daquele dia (ou mês).
+            for barra in resultado['grafico']['barras']:
+                barra['url'] = self.url_com('agenda:balanco', barra['periodo'])
+        for linha in resultado['por_barbeiro']:
+            # Na tabela do dono, tocar no barbeiro abre o balanço só dele.
+            if linha['barbeiro_id']:
+                linha['url'] = f"{reverse('agenda:balanco')}?{urlencode({**periodo.parametros(), 'barbeiro': linha['barbeiro_id']})}"
+        contexto.update(resultado)
+        return contexto
+
+    def atalhos(self, periodo, hoje):
+        """Botões de um toque para os períodos mais usados."""
+        opcoes = [
+            ('Hoje', Periodo.do_tipo('dia', hoje)),
+            ('Esta semana', Periodo.do_tipo('semana', hoje)),
+            ('Este mês', Periodo.do_tipo('mes', hoje)),
+            ('Mês passado', Periodo.do_tipo('mes', mes_anterior(hoje))),
+        ]
+        return [
+            {'texto': texto, 'url': self.url_com('agenda:balanco', p), 'ativo': p == periodo}
+            for texto, p in opcoes
+        ]
+
+
+def celula_segura(texto):
+    """
+    Evita que um nome como "=HIPERLINK(...)" vire fórmula ao abrir no Excel.
+    O nome do cliente pode vir da página pública, digitado por qualquer um.
+    """
+    texto = str(texto)
+    return "'" + texto if texto[:1] in ('=', '+', '-', '@') else texto
+
+
+class ExportarBalancoView(EscopoDoBalancoMixin, View):
+    """
+    O período em CSV, com a mesma regra de acesso da tela. Ponto e vírgula,
+    no padrão do Excel em português; o BOM no início do arquivo faz o Excel
+    ler os acentos corretamente.
+    """
+
+    def get(self, request):
+        if self.sem_vinculo:
+            raise Http404
+        periodo = Periodo.da_requisicao(request.GET, timezone.localdate())
+        atendimentos = lista_detalhada(atendimentos_do_periodo(self.barbearia, periodo, self.barbeiro))
+        nome = f'balanco-{periodo.inicio:%Y-%m-%d}-a-{periodo.fim:%Y-%m-%d}.csv'
+        resposta = HttpResponse(content_type='text/csv; charset=utf-8')
+        resposta['Content-Disposition'] = f'attachment; filename="{nome}"'
+        resposta.write('﻿')
+        planilha = csv.writer(resposta, delimiter=';')
+        planilha.writerow(['Data', 'Horário', 'Cliente', 'Barbeiro', 'Observações'])
+        # Na tela, o dia mais recente vem primeiro; na planilha, a ordem
+        # cronológica é mais útil.
+        for at in sorted(atendimentos, key=lambda a: a.data):
+            inicio = at.agendamento.inicio if at.agendamento else None
+            planilha.writerow([
+                f'{at.data:%d/%m/%Y}',
+                f'{timezone.localtime(inicio):%H:%M}' if inicio else 'sem horário',
+                celula_segura(at.cliente),
+                celula_segura(at.barbeiro or '—'),
+                celula_segura(at.observacoes),
+            ])
+        return resposta
+
+
+class RegistrarAtendimentoView(EscopoDoBalancoMixin, FormView):
+    """Atendimento de quem chegou sem hora marcada: vai direto para o histórico e o balanço."""
+
+    template_name = 'agenda/registrar_atendimento.html'
+    form_class = AtendimentoAvulsoForm
+    secao = 'balanco'
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        # O dono registra para qualquer barbeiro ativo; o barbeiro, só para si.
+        barbeiros = self.permitidos if self.eh_barbeiro else self.permitidos.filter(ativo=True)
+        kwargs.update(barbearia=self.barbearia, barbeiros=barbeiros)
+        return kwargs
+
+    def get_initial(self):
+        # A partir da ficha de um cliente, o formulário já vem com ele escolhido.
+        inicial = super().get_initial()
+        if self.request.GET.get('cliente'):
+            inicial['cliente'] = self.request.GET['cliente']
+        return inicial
+
+    def get_context_data(self, **kwargs):
+        contexto = super().get_context_data(**kwargs)
+        contexto['sem_vinculo'] = self.sem_vinculo
+        return contexto
+
+    def form_valid(self, form):
+        atendimento = form.save()
+        messages.success(self.request, f'Atendimento de {atendimento.cliente} registrado.')
+        # Volta para o balanço do dia do atendimento, onde ele já aparece.
+        return redirect(self.url_com('agenda:balanco', Periodo.do_tipo('dia', atendimento.data), atendimento.barbeiro))

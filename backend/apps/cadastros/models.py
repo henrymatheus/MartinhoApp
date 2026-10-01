@@ -7,7 +7,7 @@ from django.db import models
 from django.utils import timezone
 
 from apps.contas.models import PertenceABarbearia
-from apps.contas.telefones import link_whatsapp
+from apps.contas.telefones import link_whatsapp, mesmo_telefone, somente_digitos
 
 
 class Barbeiro(PertenceABarbearia):
@@ -76,6 +76,19 @@ class Cliente(PertenceABarbearia):
 
     def link_whatsapp(self, mensagem=''):
         return link_whatsapp(self.telefone, mensagem)
+
+
+def encontrar_ou_criar_cliente(barbearia, nome, telefone):
+    """
+    Quem já é cliente é reconhecido pelo telefone, e o agendamento vai para a
+    ficha existente, com o histórico. Um telefone novo cria um cliente novo.
+    Usado pela página do cliente e pelo registro de atendimento sem horário.
+    """
+    candidatos = Cliente.objects.filter(barbearia=barbearia, telefone__contains=somente_digitos(telefone)[-4:])
+    for cliente in candidatos:
+        if mesmo_telefone(cliente.telefone, telefone):
+            return cliente
+    return Cliente.objects.create(barbearia=barbearia, nome=nome, telefone=telefone)
 
 
 class HorarioTrabalho(models.Model):

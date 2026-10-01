@@ -1,12 +1,13 @@
 from datetime import datetime, timedelta
 
 from django import forms
+from django.db import transaction
 from django.utils import timezone
 
-from apps.cadastros.models import Barbeiro, Cliente, Servico
+from apps.cadastros.models import Barbeiro, Cliente, Servico, encontrar_ou_criar_cliente
 
 from .disponibilidade import ausente_em
-from .models import Agendamento
+from .models import Agendamento, Atendimento
 
 
 class AgendamentoForm(forms.ModelForm):
@@ -57,3 +58,80 @@ class AgendamentoForm(forms.ModelForm):
                         'ou marque "Agendar mesmo assim".'
                     )
         return dados
+
+
+class AtendimentoAvulsoForm(forms.Form):
+    """
+    Registra um atendimento de quem chegou sem hora marcada.
+
+    Não cria agendamento: o atendimento já aconteceu (ou está acontecendo),
+    então vai direto para o histórico do cliente e para o balanço. O cliente
+    é escolhido da lista ou cadastrado ali mesmo, só com nome e WhatsApp.
+    """
+
+    cliente = forms.ModelChoiceField(
+        label='Cliente cadastrado', queryset=Cliente.objects.none(), required=False, empty_label='Escolha um cliente'
+    )
+    novo_nome = forms.CharField(label='Nome', max_length=120, required=False)
+    novo_telefone = forms.CharField(
+        label='WhatsApp',
+        max_length=20,
+        required=False,
+        widget=forms.TextInput(attrs={'inputmode': 'tel', 'placeholder': '(11) 98765-4321'}),
+        help_text='Se o número já estiver cadastrado, o atendimento vai para a ficha existente.',
+    )
+    barbeiro = forms.ModelChoiceField(queryset=Barbeiro.objects.none(), empty_label=None)
+    data = forms.DateField(widget=forms.DateInput(attrs={'type': 'date'}, format='%Y-%m-%d'))
+    observacoes = forms.CharField(label='Observações', required=False, widget=forms.Textarea(attrs={'rows': 2}))
+
+    def __init__(self, *args, barbearia, barbeiros, **kwargs):
+        """`barbeiros`: com quem o usuário pode registrar (o barbeiro, só consigo mesmo)."""
+        super().__init__(*args, **kwargs)
+        self.barbearia = barbearia
+        self.fields['cliente'].queryset = Cliente.objects.filter(barbearia=barbearia)
+        self.fields['barbeiro'].queryset = barbeiros
+        self.initial.setdefault('data', timezone.localdate())
+        possiveis = list(barbeiros)
+        if len(possiveis) == 1:
+            # Só um barbeiro possível: não há o que escolher.
+            self.unico_barbeiro = possiveis[0]
+            self.initial['barbeiro'] = self.unico_barbeiro.pk
+            self.fields['barbeiro'].widget = forms.HiddenInput()
+
+    def clean_data(self):
+        data = self.cleaned_data['data']
+        if data > timezone.localdate():
+            raise forms.ValidationError('O atendimento não pode ser numa data futura. Para isso, use o agendamento.')
+        return data
+
+    def clean(self):
+        dados = super().clean()
+        if not dados.get('cliente') and not dados.get('novo_nome', '').strip():
+            raise forms.ValidationError('Escolha um cliente da lista ou preencha o nome do cliente novo.')
+        return dados
+
+    @transaction.atomic
+    def save(self):
+        """
+        Grava cliente novo (se for o caso) e atendimento juntos: tudo ou nada.
+
+        Sem serviços por enquanto (decisão do dono): o atendimento é gravado
+        sem itens, então não tem valor. O model já aceita itens, para quando
+        serviços e valores entrarem.
+        """
+        dados = self.cleaned_data
+        cliente = dados['cliente']
+        if cliente is None:
+            nome, telefone = dados['novo_nome'].strip(), dados['novo_telefone'].strip()
+            if telefone:
+                cliente = encontrar_ou_criar_cliente(self.barbearia, nome, telefone)
+            else:
+                cliente = Cliente.objects.create(barbearia=self.barbearia, nome=nome)
+        atendimento = Atendimento.objects.create(
+            barbearia=self.barbearia,
+            cliente=cliente,
+            barbeiro=dados['barbeiro'],
+            data=dados['data'],
+            observacoes=dados['observacoes'],
+        )
+        return atendimento

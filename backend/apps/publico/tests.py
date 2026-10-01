@@ -1,3 +1,4 @@
+import pathlib
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from zoneinfo import ZoneInfo
@@ -169,3 +170,15 @@ class PwaTests(Base):
         resposta = self.client.get('/sw.js')
         self.assertEqual(resposta['Content-Type'], 'application/javascript')
         self.assertContains(resposta, 'offline')
+
+    def test_versao_do_cache_muda_quando_o_css_muda(self):
+        # Sem isso, quem já abriu o sistema continuaria com o CSS antigo.
+        from unittest import mock
+
+        from . import views
+
+        antes = views.versao_dos_arquivos()
+        self.assertContains(self.client.get('/sw.js'), f"'martinho-{antes}'")
+        lido = pathlib.Path.read_bytes
+        with mock.patch.object(pathlib.Path, 'read_bytes', lambda p: lido(p) + b'/* mudou */'):
+            self.assertNotEqual(views.versao_dos_arquivos(), antes)

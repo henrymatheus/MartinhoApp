@@ -3,9 +3,12 @@ Páginas públicas: o agendamento feito pelo próprio cliente, sem login,
 e os arquivos do PWA (manifesto, service worker e página offline).
 """
 
+import hashlib
 import json
+import pathlib
 from datetime import date, datetime
 
+from django.contrib.staticfiles import finders
 from django.contrib.staticfiles.storage import staticfiles_storage
 from django.core import signing
 from django.core.exceptions import ValidationError
@@ -24,10 +27,10 @@ from apps.agenda.disponibilidade import (
     proximo_horario,
 )
 from apps.agenda.models import Agendamento
-from apps.cadastros.models import Barbeiro, Cliente, Servico
+from apps.cadastros.models import Barbeiro, Servico, encontrar_ou_criar_cliente
 from apps.contas.models import Barbearia
 from apps.contas.notificacoes import notificar_novo_agendamento
-from apps.contas.telefones import mesmo_telefone, somente_digitos
+from apps.contas.telefones import mesmo_telefone
 
 from .forms import ConfirmarAgendamentoForm
 
@@ -115,18 +118,6 @@ def ler_escolhas(barbearia, dados):
         hora = dados.get('hora', '')
         e['inicio'] = next((h for h in e['horarios'] if timezone.localtime(h).strftime('%H:%M') == hora), None)
     return e
-
-
-def encontrar_ou_criar_cliente(barbearia, nome, telefone):
-    """
-    Quem já é cliente é reconhecido pelo telefone, e o agendamento vai para a
-    ficha existente, com o histórico. Um telefone novo cria um cliente novo.
-    """
-    candidatos = Cliente.objects.filter(barbearia=barbearia, telefone__contains=somente_digitos(telefone)[-4:])
-    for cliente in candidatos:
-        if mesmo_telefone(cliente.telefone, telefone):
-            return cliente
-    return Cliente.objects.create(barbearia=barbearia, nome=nome, telefone=telefone)
 
 
 class AgendarView(View):
@@ -261,9 +252,30 @@ def manifesto_barbearia(request, slug):
     return manifesto(f'Agendar · {barbearia.nome}', barbearia.nome[:12], reverse('publico:agendar', args=[slug]), '#0e2240')
 
 
+# Arquivos que o service worker guarda no aparelho (lista ESSENCIAIS do sw.js).
+GUARDADOS_NO_APARELHO = ('css/tokens.css', 'css/martinho.css', 'img/martinho-simbolo.svg')
+
+
+def versao_dos_arquivos():
+    """
+    Uma "impressão digital" do conteúdo dos arquivos guardados no aparelho.
+
+    O service worker guarda o CSS no celular e só busca de novo quando a
+    versão muda. Com uma versão fixa, uma mudança no CSS nunca chegava a
+    quem já tinha aberto o sistema (a página vinha nova, o estilo velho).
+    Calculada pelo conteúdo, a versão muda sozinha a cada alteração.
+    """
+    impressao = hashlib.sha256()
+    for caminho in GUARDADOS_NO_APARELHO:
+        arquivo = finders.find(caminho)
+        if arquivo:
+            impressao.update(pathlib.Path(arquivo).read_bytes())
+    return impressao.hexdigest()[:12]
+
+
 def service_worker(request):
     # Servido na raiz (/sw.js) para poder atender todas as páginas do site.
-    resposta = render(request, 'publico/sw.js', {'versao': 'v2'}, content_type='application/javascript')
+    resposta = render(request, 'publico/sw.js', {'versao': versao_dos_arquivos()}, content_type='application/javascript')
     resposta['Cache-Control'] = 'no-cache'
     return resposta
 

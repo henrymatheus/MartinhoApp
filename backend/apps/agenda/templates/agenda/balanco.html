@@ -1,0 +1,170 @@
+{% extends 'base.html' %}
+{% block titulo %}{% if eh_barbeiro %}Meu balanço{% else %}Balanço{% endif %}{% endblock %}
+{% block conteudo %}
+<div class="cabecalho">
+  <div class="cabecalho__textos">
+    <span class="rotulo">{% if eh_barbeiro %}{{ barbeiro|default:"" }}{% else %}{{ barbeiro|default:"Todos os barbeiros" }}{% endif %}</span>
+    <h1 class="titulo">{% if eh_barbeiro %}Meu balanço{% else %}Balanço{% endif %}</h1>
+  </div>
+  {% if not sem_vinculo %}<a class="btn btn--primario" href="{% url 'agenda:registrar_atendimento' %}">Registrar atendimento</a>{% endif %}
+</div>
+
+<div class="filtros">
+  <div class="atalhos">
+  <nav class="atalhos__lista" aria-label="Períodos">
+    {% for a in atalhos %}
+      <a class="atalho" href="{{ a.url }}" {% if a.ativo %}aria-current="page"{% endif %}>{{ a.texto }}</a>
+    {% endfor %}
+  </nav>
+  <details class="personalizado" {% if periodo.tipo == 'livre' %}open{% endif %}>
+    <summary class="atalho" {% if periodo.tipo == 'livre' %}aria-current="page"{% endif %}>Escolher datas</summary>
+    <form class="personalizado__form" method="get">
+      <input type="hidden" name="periodo" value="livre">
+      {% if barbeiro and not eh_barbeiro %}<input type="hidden" name="barbeiro" value="{{ barbeiro.pk }}">{% endif %}
+      <div class="campo"><label for="de">De</label><input id="de" type="date" name="de" value="{{ periodo.inicio|date:'Y-m-d' }}" required></div>
+      <div class="campo"><label for="ate">Até</label><input id="ate" type="date" name="ate" value="{{ periodo.fim|date:'Y-m-d' }}" required></div>
+      <button class="btn btn--secundario" type="submit">Ver</button>
+    </form>
+  </details>
+  </div>
+  {% if not eh_barbeiro %}
+    <form class="filtro-barbeiro campo" method="get">
+      {% for chave, valor in periodo.parametros.items %}<input type="hidden" name="{{ chave }}" value="{{ valor }}">{% endfor %}
+      <label for="filtro-barbeiro">Barbeiro</label>
+      <select id="filtro-barbeiro" name="barbeiro" onchange="this.form.submit()">
+        <option value="">Todos os barbeiros</option>
+        {% for b in barbeiros %}<option value="{{ b.pk }}" {% if b == barbeiro %}selected{% endif %}>{{ b }}{% if not b.ativo %} (desativado){% endif %}</option>{% endfor %}
+      </select>
+      <noscript><button class="btn btn--secundario btn--pequeno" type="submit">Filtrar</button></noscript>
+    </form>
+  {% endif %}
+</div>
+
+{% if sem_vinculo %}
+  <div class="cartao vazio">
+    <p class="subtitulo">Seu login ainda não está ligado a um barbeiro</p>
+    <p>Peça ao dono da barbearia para ligar o seu usuário à sua ficha de barbeiro. Depois disso, seu balanço aparece aqui.</p>
+  </div>
+{% else %}
+
+<section class="cartao painel" aria-label="Atendimentos do período">
+  <div class="painel__periodo">
+    <a class="btn btn--texto btn--icone" href="{{ url_anterior }}" aria-label="Período anterior">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+    </a>
+    <div class="painel__datas">
+      <span class="corpo-forte">
+        {% if periodo.tipo == 'dia' %}{% if periodo.inicio == hoje %}Hoje{% else %}{{ periodo.inicio|date:"l, j \d\e F" }}{% endif %}
+        {% elif periodo.tipo == 'semana' %}{% if periodo.inicio <= hoje and hoje <= periodo.fim %}Esta semana{% else %}Semana de {{ periodo.inicio|date:"d/m" }}{% endif %}
+        {% elif periodo.tipo == 'mes' %}{{ periodo.inicio|date:"F \d\e Y" }}
+        {% else %}{{ periodo.dias }} dias{% endif %}
+      </span>
+      <span class="legenda">{% if periodo.tipo == 'dia' %}{{ periodo.inicio|date:"d/m/Y" }}{% else %}{{ periodo.inicio|date:"d/m" }} a {{ periodo.fim|date:"d/m/Y" }}{% endif %}</span>
+    </div>
+    {% if tem_proximo %}
+      <a class="btn btn--texto btn--icone" href="{{ url_proximo }}" aria-label="Próximo período">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+      </a>
+    {% else %}<span class="btn--icone" aria-hidden="true"></span>{% endif %}
+  </div>
+
+  <p class="painel__total">{{ quantidade }}</p>
+  <p class="painel__unidade">atendimento{{ quantidade|pluralize }}</p>
+  {% if comparacao and comparacao.variacao is not None %}
+    <p class="variacao {% if comparacao.variacao > 0 %}variacao--alta{% elif comparacao.variacao < 0 %}variacao--baixa{% endif %}">
+      {% if comparacao.variacao > 0 %}▲ +{% elif comparacao.variacao < 0 %}▼ {% endif %}{{ comparacao.variacao }}%
+      <span class="legenda">{% if periodo.tipo == 'dia' %}que o dia anterior{% elif periodo.tipo == 'semana' %}que a semana anterior{% elif periodo.tipo == 'mes' %}que o mês anterior{% else %}que o período anterior{% endif %}{% if comparacao.parcial %}, até o mesmo dia{% endif %} ({{ comparacao.quantidade }})</span>
+    </p>
+  {% endif %}
+
+  {% if grafico and grafico.maior %}
+    <figure class="grafico" aria-label="Atendimentos por {% if grafico.tipo == 'mes' %}mês{% else %}dia{% endif %}">
+      <div class="grafico__area" style="--barras: {{ grafico.barras|length }}">
+        <span class="grafico__maior">{{ grafico.maior }}</span>
+        {% for b in grafico.barras %}
+          {% if b.futuro %}
+            <span class="grafico__coluna" aria-hidden="true"></span>
+          {% else %}
+            <a class="grafico__coluna" href="{{ b.url }}" aria-label="{% if grafico.tipo == 'mes' %}{{ b.data|date:'F/Y' }}{% else %}{{ b.data|date:'l, d/m' }}{% endif %}: {{ b.quantidade }} atendimento{{ b.quantidade|pluralize }}">
+              <span class="grafico__barra" style="height: {{ b.altura }}%"></span>
+              <span class="grafico__dica" aria-hidden="true">
+                <strong>{{ b.quantidade }}</strong>
+                <span>{% if grafico.tipo == 'mes' %}{{ b.data|date:"M/Y" }}{% else %}{{ b.data|date:"D, d/m" }}{% endif %}</span>
+              </span>
+            </a>
+          {% endif %}
+        {% endfor %}
+      </div>
+      <div class="grafico__eixo" style="--barras: {{ grafico.barras|length }}" aria-hidden="true">
+        {% for b in grafico.barras %}
+          <span class="{% if b.hoje %}grafico__hoje{% endif %}">
+            {% if b.rotulo %}
+              {% if grafico.tipo == 'mes' %}{{ b.data|date:"M" }}{% else %}{{ b.data|date:"j" }}{% if grafico.barras|length <= 7 %}<br>{{ b.data|date:"D" }}{% endif %}{% endif %}
+            {% endif %}
+          </span>
+        {% endfor %}
+      </div>
+    </figure>
+  {% endif %}
+</section>
+
+<section class="formulario">
+  <h2 class="subtitulo">Estatísticas</h2>
+  <dl class="cartao estatisticas">
+    <div><dt>Média por dia</dt><dd>{{ media_por_dia }}</dd></div>
+    <div><dt>Clientes atendidos</dt><dd>{{ clientes }}</dd></div>
+    <div><dt>Faltas</dt><dd>{{ faltas }}</dd></div>
+    <div><dt>Cancelamentos</dt><dd>{{ cancelados }}</dd></div>
+  </dl>
+</section>
+
+{% if quantidade %}
+  {% if not barbeiro and por_barbeiro %}
+    <section class="formulario">
+      <h2 class="subtitulo">Por barbeiro</h2>
+      <ul class="cartao detalhamento">
+        {% for linha in por_barbeiro %}
+          <li>
+            {% if linha.url %}<a href="{{ linha.url }}">{{ linha.barbeiro__nome }}</a>{% else %}<span>Sem barbeiro</span>{% endif %}
+            <span class="numero corpo-forte">{{ linha.quantidade }}</span>
+          </li>
+        {% endfor %}
+      </ul>
+    </section>
+  {% endif %}
+
+  <section class="formulario">
+    <div class="cabecalho">
+      <h2 class="subtitulo">Atendimentos</h2>
+      <a class="btn btn--texto btn--pequeno" href="{{ url_exportar }}">Baixar planilha (CSV)</a>
+    </div>
+    {% if lista_cortada %}<p class="legenda">A lista mostra os {{ maximo_na_lista }} atendimentos mais recentes. Baixe a planilha para ver todos os {{ quantidade }}.</p>{% endif %}
+    {% for dia in dias %}
+      <div class="dia-balanco">
+        <div class="dia-balanco__topo">
+          <h3 class="corpo-forte">{% if dia.data == hoje %}Hoje{% else %}{{ dia.data|date:"l, d/m" }}{% endif %}</h3>
+          <span class="legenda">{{ dia.quantidade }} atendimento{{ dia.quantidade|pluralize }}</span>
+        </div>
+        <ul class="cartao linhas">
+          {% for at in dia.atendimentos %}
+            <li class="linha-atendimento">
+              <span class="linha-atendimento__hora">{% if at.agendamento %}{{ at.agendamento.inicio|time:"H:i" }}{% else %}<span class="etiqueta">avulso</span>{% endif %}</span>
+              <div class="linha-atendimento__textos">
+                <a href="{% url 'cadastros:cliente' at.cliente.pk %}">{{ at.cliente }}</a>
+                {% if not barbeiro %}<span class="legenda">com {{ at.barbeiro|default:"—" }}</span>{% endif %}
+              </div>
+            </li>
+          {% endfor %}
+        </ul>
+      </div>
+    {% endfor %}
+  </section>
+{% else %}
+  <div class="cartao vazio">
+    <p class="subtitulo">Nenhum atendimento neste período{% if periodo.inicio <= hoje and hoje <= periodo.fim %} ainda{% endif %}</p>
+    <p>Os atendimentos entram aqui quando você toca em "Concluir atendimento" na agenda, ou quando registra alguém que chegou sem hora marcada.</p>
+    <a class="btn btn--primario" href="{% url 'agenda:registrar_atendimento' %}">Registrar atendimento</a>
+  </div>
+{% endif %}
+{% endif %}
+{% endblock %}
