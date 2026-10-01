@@ -31,6 +31,25 @@
   </footer>
   <script>
     if ('serviceWorker' in navigator) { navigator.serviceWorker.register('{% url "publico:service_worker" %}'); }
+
+    // App instalado não tem botão de recarregar, e o celular reabre a página
+    // que ficou na memória. Ao voltar para a tela depois de 1 minuto, a página
+    // é buscada de novo, para mostrar os horários de agora. Não recarrega se
+    // o cliente já começou a digitar o nome ou o WhatsApp.
+    (function () {
+      var saiuEm = null;
+      function digitando() {
+        return Array.prototype.some.call(document.querySelectorAll('form input[type="text"], form input[type="tel"]'),
+          function (campo) { return campo.value.trim() !== ''; });
+      }
+      function atualizar() { if (!digitando()) location.reload(); }
+      document.addEventListener('visibilitychange', function () {
+        if (document.hidden) { saiuEm = Date.now(); return; }
+        if (saiuEm && Date.now() - saiuEm > 60000) atualizar();
+      });
+      // Voltou pelo "voltar" do navegador com a página guardada na memória.
+      window.addEventListener('pageshow', function (evento) { if (evento.persisted) atualizar(); });
+    })();
   </script>
 </body>
 </html>

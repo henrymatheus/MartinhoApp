@@ -171,6 +171,18 @@ class PwaTests(Base):
         self.assertEqual(resposta['Content-Type'], 'application/javascript')
         self.assertContains(resposta, 'offline')
 
+    def test_agenda_publicada_pelo_barbeiro_aparece_e_a_pagina_nao_fica_guardada(self):
+        # O cliente abriu a página antes de o barbeiro cadastrar a agenda.
+        paulo = Barbeiro.objects.create(barbearia=self.barbearia, nome='Paulo')
+        url = reverse('publico:agendar', args=[self.barbearia.slug])
+        self.assertNotContains(self.client.get(url), 'Paulo')
+        for dia in range(7):
+            HorarioTrabalho.objects.create(barbeiro=paulo, dia_semana=dia, inicio=time(0), fim=time(23, 45))
+        resposta = self.client.get(url)
+        self.assertContains(resposta, f'?barbeiro={paulo.pk}')
+        # Sem isso, o app instalado reabria a cópia antiga, sem o Paulo.
+        self.assertIn('no-store', resposta['Cache-Control'])
+
     def test_versao_do_cache_muda_quando_o_css_muda(self):
         # Sem isso, quem já abriu o sistema continuaria com o CSS antigo.
         from unittest import mock

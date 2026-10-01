@@ -17,7 +17,9 @@ from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.decorators import method_decorator
 from django.views import View
+from django.views.decorators.cache import never_cache
 
 from apps.agenda.disponibilidade import (
     ausente_o_dia_todo,
@@ -120,6 +122,10 @@ def ler_escolhas(barbearia, dados):
     return e
 
 
+# never_cache: os horários livres mudam o tempo todo (o barbeiro cadastra a
+# agenda, outro cliente marca). A resposta vai com "Cache-Control: no-store",
+# para o navegador e o app instalado nunca mostrarem uma cópia guardada.
+@method_decorator(never_cache, name='dispatch')
 class AgendarView(View):
     template_name = 'publico/agendar.html'
 
