@@ -4,4 +4,5 @@ Sistema de gestão para barbearias: agenda, clientes e histórico de atendimento
 
 - Funcionalidades e decisões: [FEATURES.md](FEATURES.md)
 - Identidade visual: [docs/marca/](docs/marca/)
-- Sistema desktop antigo (Tkinter), mantido como referência: [legacy/](legacy/)
+- O sistema (Django): [backend/](backend/README.md)
+- Uma versão em Next.js + Supabase, iniciada e deixada de lado, fica no branch `nextjs`

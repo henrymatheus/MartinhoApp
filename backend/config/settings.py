@@ -2,8 +2,8 @@
 Configurações do Django para o Martinho.
 
 Na sua máquina, o projeto roda sem configurar nada: SQLite e DEBUG ligado.
-Em produção (Render), os valores vêm de variáveis de ambiente cadastradas
-no painel do Render: DJANGO_SECRET_KEY, DATABASE_URL (Supabase) etc.
+Em produção (Vercel), os valores vêm de variáveis de ambiente cadastradas
+no painel da Vercel: DJANGO_SECRET_KEY, DATABASE_URL (Supabase) etc.
 Se quiser mudar algo localmente, crie um backend/.env (veja .env.example).
 """
 
@@ -27,9 +27,11 @@ def env_list(nome, padrao=''):
     return [item.strip() for item in os.environ.get(nome, padrao).split(',') if item.strip()]
 
 
-# O Render define a variável RENDER em todos os serviços. Com ela, sabemos
-# que estamos em produção sem depender de alguém lembrar de desligar o DEBUG.
-EM_PRODUCAO = 'RENDER' in os.environ
+# A Vercel define a variável VERCEL (e o Render, a RENDER) nos seus
+# servidores, inclusive durante o build. Com ela, sabemos que estamos em
+# produção sem depender de alguém lembrar de desligar o DEBUG.
+NA_VERCEL = 'VERCEL' in os.environ
+EM_PRODUCAO = NA_VERCEL or 'RENDER' in os.environ
 
 DEBUG = env_bool('DJANGO_DEBUG', not EM_PRODUCAO)
 
@@ -47,6 +49,16 @@ ALLOWED_HOSTS = env_list('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1')
 RENDER_HOST = os.environ.get('RENDER_EXTERNAL_HOSTNAME')
 if RENDER_HOST:
     ALLOWED_HOSTS.append(RENDER_HOST)
+
+# A Vercel informa os endereços do deploy nestas variáveis: o domínio de
+# produção (martinho-app.vercel.app ou um domínio próprio), o do branch e
+# o endereço único de cada deploy (usado nas pré-visualizações).
+VERCEL_HOSTS = [
+    os.environ[nome]
+    for nome in ('VERCEL_PROJECT_PRODUCTION_URL', 'VERCEL_BRANCH_URL', 'VERCEL_URL')
+    if os.environ.get(nome)
+]
+ALLOWED_HOSTS += VERCEL_HOSTS
 
 
 INSTALLED_APPS = [
@@ -100,17 +112,26 @@ WSGI_APPLICATION = 'config.wsgi.application'
 
 # Banco de dados:
 # - sem DATABASE_URL (sua máquina): SQLite, no arquivo backend/db.sqlite3;
-# - com DATABASE_URL (Render): PostgreSQL do Supabase.
-# conn_max_age reaproveita a conexão entre requisições, o que economiza
-# tempo com o Supabase, que fica em outro servidor.
+# - com DATABASE_URL (Vercel): PostgreSQL do Supabase.
+#
+# Na Vercel o Django não é um servidor sempre ligado: ele roda em várias
+# cópias que nascem e morrem conforme o movimento. Se cada cópia segurasse
+# uma conexão aberta (conn_max_age), as conexões do Supabase gratuito
+# acabariam. Por isso lá cada requisição abre e fecha a sua (conn_max_age=0),
+# passando pelo pooler do Supabase em modo "transaction" (porta 6543), que
+# divide poucas conexões reais entre muitas cópias.
 DATABASES = {
     'default': dj_database_url.config(
         env='DATABASE_URL',
         default=f'sqlite:///{BASE_DIR / "db.sqlite3"}',
-        conn_max_age=600,
-        conn_health_checks=True,
+        conn_max_age=0 if NA_VERCEL else 600,
+        conn_health_checks=not NA_VERCEL,
     ),
 }
+if NA_VERCEL:
+    # No modo "transaction" do pooler, a conexão real pode mudar entre uma
+    # consulta e outra; cursores do lado do servidor quebrariam com isso.
+    DATABASES['default']['DISABLE_SERVER_SIDE_CURSORS'] = True
 
 # Os testes criam e apagam um banco temporário. Eles usam sempre o SQLite,
 # para nunca criar esse banco no servidor do Supabase, mesmo com
@@ -153,6 +174,10 @@ STORAGES = {
     # de nomes com hash, e assim os testes rodam sem collectstatic.
     'staticfiles': {'BACKEND': 'whitenoise.storage.CompressedStaticFilesStorage'},
 }
+if NA_VERCEL:
+    # Na Vercel, o collectstatic roda sozinho no build e os arquivos são
+    # servidos pelo CDN dela; o armazenamento padrão do Django basta.
+    STORAGES['staticfiles'] = {'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage'}
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
@@ -165,7 +190,7 @@ VAPID_PRIVATE_KEY = os.environ.get('VAPID_PRIVATE_KEY', '')
 VAPID_EMAIL = os.environ.get('VAPID_EMAIL', 'mailto:contato@martinho.app')
 
 
-# Segurança em produção (Render serve por HTTPS atrás de um proxy).
+# Segurança em produção (Vercel e Render servem por HTTPS atrás de um proxy).
 if not DEBUG:
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
     SECURE_SSL_REDIRECT = env_bool('DJANGO_SSL_REDIRECT', True)
@@ -174,3 +199,5 @@ if not DEBUG:
     CSRF_TRUSTED_ORIGINS = env_list('DJANGO_CSRF_TRUSTED_ORIGINS')
     if RENDER_HOST:
         CSRF_TRUSTED_ORIGINS.append(f'https://{RENDER_HOST}')
+    # Formulários enviados a partir dos endereços da Vercel (login, agendamento).
+    CSRF_TRUSTED_ORIGINS += [f'https://{host}' for host in VERCEL_HOSTS]
