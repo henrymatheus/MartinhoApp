@@ -4,9 +4,9 @@
 {% block conteudo %}
 <div class="cabecalho">
   <div class="cabecalho__textos">
-    <a class="legenda" href="{% url 'agenda:balanco' %}">Balanço</a>
+    <a class="legenda" href="{% url 'agenda:historico' %}">Histórico</a>
     <h1 class="titulo">Registrar atendimento</h1>
-    <p class="legenda">Para quem chegou sem hora marcada. Entra no histórico do cliente e no balanço.</p>
+    <p class="legenda">Para quem chegou sem hora marcada. Entra na ficha do cliente e no histórico de atendimentos, com o valor dos serviços.</p>
   </div>
 </div>
 
@@ -39,12 +39,20 @@
     {% include 'includes/campo.html' with campo=form.barbeiro %}
   {% endif %}
 
+  <fieldset class="grupo{% if form.servicos.errors %} campo--erro{% endif %}">
+    <legend class="corpo-forte">Serviços</legend>
+    <div class="servicos-marcar">
+      {% for opcao in form.servicos %}<label class="marcar">{{ opcao.tag }} {{ opcao.choice_label }}</label>{% empty %}<p class="legenda">Nenhum serviço ativo. Cadastre na administração, em Serviços.</p>{% endfor %}
+    </div>
+    {% for erro in form.servicos.errors %}<span class="campo__erro">{{ erro }}</span>{% endfor %}
+  </fieldset>
+
   {% include 'includes/campo.html' with campo=form.data %}
   {% include 'includes/campo.html' with campo=form.observacoes %}
 
   <div class="linha-acoes">
     <button class="btn btn--primario" type="submit">Registrar</button>
-    <a class="btn btn--secundario" href="{% url 'agenda:balanco' %}">Voltar</a>
+    <a class="btn btn--secundario" href="{% url 'agenda:historico' %}">Voltar</a>
   </div>
 </form>
 {% endif %}

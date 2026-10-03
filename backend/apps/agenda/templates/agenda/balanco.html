@@ -1,10 +1,10 @@
 {% extends 'base.html' %}
-{% block titulo %}{% if eh_barbeiro %}Meu balanço{% else %}Balanço{% endif %}{% endblock %}
+{% block titulo %}{% if eh_barbeiro %}Meu histórico{% else %}Histórico de atendimentos{% endif %}{% endblock %}
 {% block conteudo %}
 <div class="cabecalho">
   <div class="cabecalho__textos">
     <span class="rotulo">{% if eh_barbeiro %}{{ barbeiro|default:"" }}{% else %}{{ barbeiro|default:"Todos os barbeiros" }}{% endif %}</span>
-    <h1 class="titulo">{% if eh_barbeiro %}Meu balanço{% else %}Balanço{% endif %}</h1>
+    <h1 class="titulo">{% if eh_barbeiro %}Meu histórico{% else %}Histórico de atendimentos{% endif %}</h1>
   </div>
   {% if not sem_vinculo %}<a class="btn btn--primario" href="{% url 'agenda:registrar_atendimento' %}">Registrar atendimento</a>{% endif %}
 </div>
@@ -43,7 +43,7 @@
 {% if sem_vinculo %}
   <div class="cartao vazio">
     <p class="subtitulo">Seu login ainda não está ligado a um barbeiro</p>
-    <p>Peça ao dono da barbearia para ligar o seu usuário à sua ficha de barbeiro. Depois disso, seu balanço aparece aqui.</p>
+    <p>Peça ao dono da barbearia para ligar o seu usuário à sua ficha de barbeiro. Depois disso, seu histórico aparece aqui.</p>
   </div>
 {% else %}
 
@@ -74,6 +74,15 @@
     <p class="variacao {% if comparacao.variacao > 0 %}variacao--alta{% elif comparacao.variacao < 0 %}variacao--baixa{% endif %}">
       {% if comparacao.variacao > 0 %}▲ +{% elif comparacao.variacao < 0 %}▼ {% endif %}{{ comparacao.variacao }}%
       <span class="legenda">{% if periodo.tipo == 'dia' %}que o dia anterior{% elif periodo.tipo == 'semana' %}que a semana anterior{% elif periodo.tipo == 'mes' %}que o mês anterior{% else %}que o período anterior{% endif %}{% if comparacao.parcial %}, até o mesmo dia{% endif %} ({{ comparacao.quantidade }})</span>
+    </p>
+  {% endif %}
+
+  <p class="painel__valor">R$ {{ faturamento|floatformat:"2g" }}</p>
+  <p class="painel__unidade">faturados{% if quantidade %} · ticket médio R$ {{ ticket_medio|floatformat:"2g" }}{% endif %}</p>
+  {% if comparacao and comparacao.variacao_faturamento is not None %}
+    <p class="variacao {% if comparacao.variacao_faturamento > 0 %}variacao--alta{% elif comparacao.variacao_faturamento < 0 %}variacao--baixa{% endif %}">
+      {% if comparacao.variacao_faturamento > 0 %}▲ +{% elif comparacao.variacao_faturamento < 0 %}▼ {% endif %}{{ comparacao.variacao_faturamento }}%
+      <span class="legenda">no faturamento (R$ {{ comparacao.faturamento|floatformat:"2g" }})</span>
     </p>
   {% endif %}
 
@@ -111,6 +120,8 @@
 <section class="formulario">
   <h2 class="subtitulo">Estatísticas</h2>
   <dl class="cartao estatisticas">
+    <div><dt>Faturamento</dt><dd>R$ {{ faturamento|floatformat:"2g" }}</dd></div>
+    <div><dt>Ticket médio</dt><dd>R$ {{ ticket_medio|floatformat:"2g" }}</dd></div>
     <div><dt>Média por dia</dt><dd>{{ media_por_dia }}</dd></div>
     <div><dt>Clientes atendidos</dt><dd>{{ clientes }}</dd></div>
     <div><dt>Faltas</dt><dd>{{ faltas }}</dd></div>
@@ -119,6 +130,22 @@
 </section>
 
 {% if quantidade %}
+  <section class="formulario">
+    <h2 class="subtitulo">Serviços</h2>
+    {% if por_servico %}
+      <ul class="cartao detalhamento">
+        {% for s in por_servico %}
+          <li>
+            <span>{{ s.descricao }}</span>
+            <span class="detalhamento__numeros"><span class="legenda">{{ s.quantidade }}×</span> <span class="numero corpo-forte">R$ {{ s.valor|floatformat:"2g" }}</span></span>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="legenda">Os atendimentos deste período não têm serviços registrados.</p>
+    {% endif %}
+  </section>
+
   {% if not barbeiro and por_barbeiro %}
     <section class="formulario">
       <h2 class="subtitulo">Por barbeiro</h2>
@@ -126,7 +153,7 @@
         {% for linha in por_barbeiro %}
           <li>
             {% if linha.url %}<a href="{{ linha.url }}">{{ linha.barbeiro__nome }}</a>{% else %}<span>Sem barbeiro</span>{% endif %}
-            <span class="numero corpo-forte">{{ linha.quantidade }}</span>
+            <span class="detalhamento__numeros"><span class="legenda">{{ linha.quantidade }} atendimento{{ linha.quantidade|pluralize }}</span> <span class="numero corpo-forte">R$ {{ linha.valor|default:0|floatformat:"2g" }}</span></span>
           </li>
         {% endfor %}
       </ul>
@@ -143,7 +170,7 @@
       <div class="dia-balanco">
         <div class="dia-balanco__topo">
           <h3 class="corpo-forte">{% if dia.data == hoje %}Hoje{% else %}{{ dia.data|date:"l, d/m" }}{% endif %}</h3>
-          <span class="legenda">{{ dia.quantidade }} atendimento{{ dia.quantidade|pluralize }}</span>
+          <span class="legenda">{{ dia.quantidade }} atendimento{{ dia.quantidade|pluralize }} · R$ {{ dia.valor|floatformat:"2g" }}</span>
         </div>
         <ul class="cartao linhas">
           {% for at in dia.atendimentos %}
@@ -151,8 +178,9 @@
               <span class="linha-atendimento__hora">{% if at.agendamento %}{{ at.agendamento.inicio|time:"H:i" }}{% else %}<span class="etiqueta">avulso</span>{% endif %}</span>
               <div class="linha-atendimento__textos">
                 <a href="{% url 'cadastros:cliente' at.cliente.pk %}">{{ at.cliente }}</a>
-                {% if not barbeiro %}<span class="legenda">com {{ at.barbeiro|default:"—" }}</span>{% endif %}
+                <span class="legenda">{% for item in at.itens.all %}{{ item.descricao }}{% if not forloop.last %}, {% endif %}{% empty %}sem serviço registrado{% endfor %}{% if not barbeiro %} · com {{ at.barbeiro|default:"—" }}{% endif %}</span>
               </div>
+              <span class="linha-atendimento__valor numero">R$ {{ at.total|floatformat:"2g" }}</span>
             </li>
           {% endfor %}
         </ul>

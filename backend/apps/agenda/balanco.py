@@ -1,23 +1,29 @@
 """
-Balanço de atendimentos: o período escolhido e as contas.
+Histórico de atendimentos (a antiga tela "Balanço"): o período escolhido
+e as contas.
 
-Todas as contagens são feitas pelo banco (aggregate/annotate), numa consulta
-para cada número. Assim o balanço de um mês inteiro custa as mesmas poucas
-consultas que o de um dia.
+Todas as contagens e somas são feitas pelo banco (aggregate/annotate), numa
+consulta para cada número. Assim o histórico de um mês inteiro custa as
+mesmas poucas consultas que o de um dia.
+
+Os valores vêm dos itens de cada atendimento (ItemAtendimento), que guardam
+a descrição e o preço do serviço no dia em que foi feito. Se o preço do
+corte subir amanhã, o faturamento de hoje não muda.
 """
 
 import calendar
 from dataclasses import dataclass
 from datetime import date, timedelta
+from decimal import Decimal
 from itertools import groupby
 
-from django.db.models import Count, F, Q
+from django.db.models import Count, F, Q, Sum
 from django.db.models.functions import TruncMonth
 
 from apps.cadastros.models import Barbeiro
 from apps.contas.models import Usuario
 
-from .models import Agendamento, Atendimento
+from .models import Agendamento, Atendimento, ItemAtendimento
 
 # Uma faixa personalizada maior que isto é cortada: evita uma tela com
 # milhares de linhas. Para períodos longos, o CSV tem tudo.
@@ -133,7 +139,7 @@ class Periodo:
 
 def barbeiros_do_balanco(usuario):
     """
-    De quais barbeiros o usuário pode ver o balanço.
+    De quais barbeiros o usuário pode ver o histórico de atendimentos.
 
     - Dono: todos da barbearia, inclusive os desativados (o histórico
       deles continua valendo).
@@ -170,25 +176,50 @@ def dias_decorridos(periodo, hoje):
     return (min(periodo.fim, hoje) - periodo.inicio).days + 1
 
 
+def itens_do_periodo(atendimentos):
+    """Os serviços feitos nos atendimentos do período (um atendimento pode ter vários)."""
+    return ItemAtendimento.objects.filter(atendimento__in=atendimentos.order_by().values('pk'))
+
+
+def faturamento_de(atendimentos):
+    """Soma dos valores dos serviços. Atendimento sem serviço registrado conta R$ 0."""
+    return itens_do_periodo(atendimentos).aggregate(total=Sum('valor'))['total'] or Decimal('0')
+
+
 def calcular(barbearia, periodo, hoje, barbeiro=None):
     """
-    Os números do painel. Por enquanto o balanço conta atendimentos e não
-    mostra valores em dinheiro (decisão do dono). O preço continua sendo
-    gravado no histórico, para quando os valores entrarem.
+    Os números do painel: quantidade de atendimentos, faturamento, volume
+    de cada serviço, e os mesmos números por barbeiro e por dia.
     """
     atendimentos = atendimentos_do_periodo(barbearia, periodo, barbeiro)
     # order_by() vazio: o Atendimento tem ordenação padrão (-data, -criado_em)
     # e, num values().annotate(), o Django colocaria esses campos no GROUP BY,
     # quebrando o agrupamento. Por isso cada agrupamento define a sua ordem.
     agrupado = atendimentos.order_by()
+    itens = itens_do_periodo(atendimentos)
 
     resumo = agrupado.aggregate(quantidade=Count('id'), clientes=Count('cliente', distinct=True))
     quantidade = resumo['quantidade']
+    faturamento = itens.aggregate(total=Sum('valor'))['total'] or Decimal('0')
     por_dia = {linha['data']: linha['quantidade'] for linha in agrupado.values('data').annotate(quantidade=Count('id'))}
+    valor_por_dia = {
+        linha['atendimento__data']: linha['valor']
+        for linha in itens.values('atendimento__data').annotate(valor=Sum('valor')).order_by()
+    }
+    # A soma dos itens junta cada atendimento aos seus serviços; um atendimento
+    # com corte e barba apareceria duas vezes. distinct=True conta cada
+    # atendimento uma vez só, e o Sum soma cada serviço uma vez.
     por_barbeiro = (
         agrupado.values('barbeiro_id', 'barbeiro__nome')
-        .annotate(quantidade=Count('id'))
+        .annotate(quantidade=Count('id', distinct=True), valor=Sum('itens__valor'))
         .order_by('-quantidade', 'barbeiro__nome')
+    )
+    # Volume de cada serviço. Agrupa pela descrição copiada no atendimento
+    # (e não pelo cadastro), para um serviço já apagado continuar aparecendo.
+    por_servico = (
+        itens.values('descricao')
+        .annotate(quantidade=Count('id'), valor=Sum('valor'))
+        .order_by('-quantidade', 'descricao')
     )
 
     agendamentos = Agendamento.objects.filter(
@@ -204,11 +235,15 @@ def calcular(barbearia, periodo, hoje, barbeiro=None):
     comparacao = None
     anterior = periodo.para_comparar(hoje)
     if anterior is not None:
-        quantidade_anterior = atendimentos_do_periodo(barbearia, anterior, barbeiro).count()
+        atendimentos_anteriores = atendimentos_do_periodo(barbearia, anterior, barbeiro)
+        quantidade_anterior = atendimentos_anteriores.count()
+        faturamento_anterior = faturamento_de(atendimentos_anteriores)
         comparacao = {
             'periodo': anterior,
             'quantidade': quantidade_anterior,
             'variacao': variacao(quantidade, quantidade_anterior),
+            'faturamento': faturamento_anterior,
+            'variacao_faturamento': variacao(faturamento, faturamento_anterior),
             # Semana ou mês em andamento: comparado só até o mesmo dia.
             'parcial': periodo.tipo != 'dia' and periodo.contem(hoje),
         }
@@ -219,12 +254,16 @@ def calcular(barbearia, periodo, hoje, barbeiro=None):
         'clientes': resumo['clientes'],
         # Uma casa decimal: 3,4 atendimentos por dia diz mais que "3".
         'media_por_dia': round(quantidade / decorridos, 1) if decorridos else 0,
+        'faturamento': faturamento,
+        # Ticket médio: quanto, em média, cada atendimento rendeu.
+        'ticket_medio': (faturamento / quantidade).quantize(Decimal('0.01')) if quantidade else Decimal('0'),
         'faltas': perdas['faltas'],
         'cancelados': perdas['cancelados'],
         'grafico': grafico(periodo, atendimentos, por_dia, hoje),
         'por_barbeiro': list(por_barbeiro),
+        'por_servico': list(por_servico),
         'comparacao': comparacao,
-        'dias': lista_por_dia(atendimentos, por_dia),
+        'dias': lista_por_dia(atendimentos, por_dia, valor_por_dia),
         'lista_cortada': quantidade > MAXIMO_NA_LISTA,
         'maximo_na_lista': MAXIMO_NA_LISTA,
     }
@@ -293,15 +332,24 @@ def lista_detalhada(atendimentos):
     não tem hora: fica depois dos agendados do mesmo dia, na ordem em que
     foi registrado.
     """
-    return atendimentos.select_related('cliente', 'barbeiro', 'agendamento').order_by(
-        '-data', F('agendamento__inicio').asc(nulls_last=True), 'criado_em'
+    # prefetch_related('itens'): os serviços de todos os atendimentos numa só
+    # consulta, para mostrar os serviços e o valor de cada linha.
+    return (
+        atendimentos.select_related('cliente', 'barbeiro', 'agendamento')
+        .prefetch_related('itens')
+        .order_by('-data', F('agendamento__inicio').asc(nulls_last=True), 'criado_em')
     )
 
 
-def lista_por_dia(atendimentos, por_dia):
-    """Dias do mais recente para o mais antigo, cada um com a quantidade e os atendimentos."""
+def lista_por_dia(atendimentos, por_dia, valor_por_dia):
+    """Dias do mais recente para o mais antigo, cada um com a quantidade, o valor e os atendimentos."""
     lista = lista_detalhada(atendimentos)[:MAXIMO_NA_LISTA]
     return [
-        {'data': dia, 'quantidade': por_dia[dia], 'atendimentos': list(do_dia)}
+        {
+            'data': dia,
+            'quantidade': por_dia[dia],
+            'valor': valor_por_dia.get(dia, Decimal('0')),
+            'atendimentos': list(do_dia),
+        }
         for dia, do_dia in groupby(lista, key=lambda at: at.data)
     ]

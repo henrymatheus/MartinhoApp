@@ -260,6 +260,8 @@ p { margin: 0; }
 .painel__datas { display: flex; flex-direction: column; min-width: 0; }
 .painel__total { font: 600 56px/60px var(--font-texto); margin-top: var(--espaco-2); }
 .painel__unidade { font: 500 15px/22px var(--font-texto); color: var(--texto-suave); }
+/* Faturamento do período, logo abaixo da quantidade. */
+.painel__valor { font: 600 28px/34px var(--font-texto); margin-top: var(--espaco-3); font-variant-numeric: tabular-nums; }
 .variacao { font: 600 13px/18px var(--font-texto); color: var(--texto-suave); }
 .variacao--alta { color: var(--sucesso); }
 .variacao--baixa { color: var(--perigo); }
@@ -304,7 +306,7 @@ a.grafico__coluna:hover .grafico__dica, a.grafico__coluna:focus-visible .grafico
 .dia-balanco__topo { display: flex; align-items: baseline; justify-content: space-between; gap: var(--espaco-3); flex-wrap: wrap; }
 .dia-balanco__topo h3 { font-size: 15px; }
 .linhas { list-style: none; margin: 0; padding: 0; }
-.linha-atendimento { display: grid; grid-template-columns: 52px 1fr; gap: var(--espaco-3); align-items: center; padding: var(--espaco-3) var(--espaco-4); border-bottom: 1px solid var(--linha); }
+.linha-atendimento { display: grid; grid-template-columns: 52px 1fr auto; gap: var(--espaco-3); align-items: center; padding: var(--espaco-3) var(--espaco-4); border-bottom: 1px solid var(--linha); }
 .linha-atendimento:last-child { border-bottom: 0; }
 .linha-atendimento__hora { font-weight: 600; font-variant-numeric: tabular-nums; }
 .linha-atendimento__textos { display: flex; flex-direction: column; min-width: 0; }
@@ -317,6 +319,11 @@ a.grafico__coluna:hover .grafico__dica, a.grafico__coluna:focus-visible .grafico
 .grupo legend { padding: 0; margin-bottom: var(--espaco-3); }
 .cliente-novo summary { cursor: pointer; color: var(--azul); font-weight: 600; min-height: 44px; display: flex; align-items: center; }
 .cliente-novo[open] summary { margin-bottom: var(--espaco-3); }
+
+/* Histórico: valor de cada atendimento e números das listas por serviço e barbeiro. */
+.linha-atendimento__valor { font-weight: 600; }
+.detalhamento__numeros { display: inline-flex; align-items: baseline; gap: var(--espaco-3); white-space: nowrap; }
+.servicos-marcar { display: flex; flex-wrap: wrap; gap: 0 var(--espaco-4); }
 
 @media (max-width: 560px) {
   .topo__usuario span { display: none; }

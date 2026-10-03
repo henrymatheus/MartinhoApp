@@ -255,7 +255,7 @@ class MudarStatusView(DaBarbeariaMixin, View):
 
 class EscopoDoBalancoMixin(DaBarbeariaMixin):
     """
-    Decide de quem é o balanço que a tela mostra.
+    Decide de quem é o histórico que a tela mostra.
 
     O barbeiro sempre vê o próprio: o ?barbeiro= da URL é ignorado para ele,
     então não adianta trocar o número para ver o de um colega. O dono vê
@@ -288,14 +288,14 @@ class EscopoDoBalancoMixin(DaBarbeariaMixin):
 
 class BalancoView(EscopoDoBalancoMixin, TemplateView):
     """
-    Painel de atendimentos do período: quantidade, gráfico por dia,
-    comparação com o período anterior, estatísticas, resumo por barbeiro
-    (para o dono) e a lista de atendimentos dia a dia. Sem valores em
-    dinheiro por enquanto.
+    Histórico de atendimentos do período (a antiga tela "Balanço"):
+    quantidade e faturamento, gráfico por dia, comparação com o período
+    anterior, estatísticas, volume e valor de cada serviço, resumo por
+    barbeiro (para o dono) e a lista de atendimentos dia a dia.
     """
 
     template_name = 'agenda/balanco.html'
-    secao = 'balanco'
+    secao = 'historico'
 
     def get_context_data(self, **kwargs):
         contexto = super().get_context_data(**kwargs)
@@ -308,11 +308,11 @@ class BalancoView(EscopoDoBalancoMixin, TemplateView):
             barbeiro=self.barbeiro,
             barbeiros=self.permitidos,
             atalhos=self.atalhos(periodo, hoje),
-            url_anterior=self.url_com('agenda:balanco', periodo.deslocar(-1)),
-            url_proximo=self.url_com('agenda:balanco', periodo.deslocar(1)),
+            url_anterior=self.url_com('agenda:historico', periodo.deslocar(-1)),
+            url_proximo=self.url_com('agenda:historico', periodo.deslocar(1)),
             # Não há atendimento no futuro: a seta "próximo" para no período atual.
             tem_proximo=periodo.fim < hoje,
-            url_exportar=self.url_com('agenda:exportar_balanco', periodo),
+            url_exportar=self.url_com('agenda:exportar_historico', periodo),
         )
         if self.sem_vinculo:
             # Não há o que mostrar; a tela explica o que fazer.
@@ -320,13 +320,13 @@ class BalancoView(EscopoDoBalancoMixin, TemplateView):
             return contexto
         resultado = calcular(self.barbearia, periodo, hoje, self.barbeiro)
         if resultado['grafico']:
-            # Tocar numa barra abre o balanço daquele dia (ou mês).
+            # Tocar numa barra abre o histórico daquele dia (ou mês).
             for barra in resultado['grafico']['barras']:
-                barra['url'] = self.url_com('agenda:balanco', barra['periodo'])
+                barra['url'] = self.url_com('agenda:historico', barra['periodo'])
         for linha in resultado['por_barbeiro']:
-            # Na tabela do dono, tocar no barbeiro abre o balanço só dele.
+            # Na tabela do dono, tocar no barbeiro abre o histórico só dele.
             if linha['barbeiro_id']:
-                linha['url'] = f"{reverse('agenda:balanco')}?{urlencode({**periodo.parametros(), 'barbeiro': linha['barbeiro_id']})}"
+                linha['url'] = f"{reverse('agenda:historico')}?{urlencode({**periodo.parametros(), 'barbeiro': linha['barbeiro_id']})}"
         contexto.update(resultado)
         return contexto
 
@@ -339,7 +339,7 @@ class BalancoView(EscopoDoBalancoMixin, TemplateView):
             ('Mês passado', Periodo.do_tipo('mes', mes_anterior(hoje))),
         ]
         return [
-            {'texto': texto, 'url': self.url_com('agenda:balanco', p), 'ativo': p == periodo}
+            {'texto': texto, 'url': self.url_com('agenda:historico', p), 'ativo': p == periodo}
             for texto, p in opcoes
         ]
 
@@ -365,12 +365,12 @@ class ExportarBalancoView(EscopoDoBalancoMixin, View):
             raise Http404
         periodo = Periodo.da_requisicao(request.GET, timezone.localdate())
         atendimentos = lista_detalhada(atendimentos_do_periodo(self.barbearia, periodo, self.barbeiro))
-        nome = f'balanco-{periodo.inicio:%Y-%m-%d}-a-{periodo.fim:%Y-%m-%d}.csv'
+        nome = f'historico-{periodo.inicio:%Y-%m-%d}-a-{periodo.fim:%Y-%m-%d}.csv'
         resposta = HttpResponse(content_type='text/csv; charset=utf-8')
         resposta['Content-Disposition'] = f'attachment; filename="{nome}"'
         resposta.write('﻿')
         planilha = csv.writer(resposta, delimiter=';')
-        planilha.writerow(['Data', 'Horário', 'Cliente', 'Barbeiro', 'Observações'])
+        planilha.writerow(['Data', 'Horário', 'Cliente', 'Barbeiro', 'Serviços', 'Valor', 'Observações'])
         # Na tela, o dia mais recente vem primeiro; na planilha, a ordem
         # cronológica é mais útil.
         for at in sorted(atendimentos, key=lambda a: a.data):
@@ -380,17 +380,20 @@ class ExportarBalancoView(EscopoDoBalancoMixin, View):
                 f'{timezone.localtime(inicio):%H:%M}' if inicio else 'sem horário',
                 celula_segura(at.cliente),
                 celula_segura(at.barbeiro or '—'),
+                celula_segura(', '.join(item.descricao for item in at.itens.all())),
+                # Número com vírgula e sem "R$", para o Excel somar a coluna.
+                f'{at.total:.2f}'.replace('.', ','),
                 celula_segura(at.observacoes),
             ])
         return resposta
 
 
 class RegistrarAtendimentoView(EscopoDoBalancoMixin, FormView):
-    """Atendimento de quem chegou sem hora marcada: vai direto para o histórico e o balanço."""
+    """Atendimento de quem chegou sem hora marcada: vai direto para a ficha do cliente e o histórico."""
 
     template_name = 'agenda/registrar_atendimento.html'
     form_class = AtendimentoAvulsoForm
-    secao = 'balanco'
+    secao = 'historico'
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
@@ -414,5 +417,5 @@ class RegistrarAtendimentoView(EscopoDoBalancoMixin, FormView):
     def form_valid(self, form):
         atendimento = form.save()
         messages.success(self.request, f'Atendimento de {atendimento.cliente} registrado.')
-        # Volta para o balanço do dia do atendimento, onde ele já aparece.
-        return redirect(self.url_com('agenda:balanco', Periodo.do_tipo('dia', atendimento.data), atendimento.barbeiro))
+        # Volta para o histórico do dia do atendimento, onde ele já aparece.
+        return redirect(self.url_com('agenda:historico', Periodo.do_tipo('dia', atendimento.data), atendimento.barbeiro))

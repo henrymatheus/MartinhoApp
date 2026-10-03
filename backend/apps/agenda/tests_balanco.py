@@ -135,6 +135,35 @@ class CalculoTests(BaseBalanco):
         comparacao = calcular(self.barbearia, self.semana(), QUINTA)['comparacao']
         self.assertEqual((comparacao['quantidade'], comparacao['variacao'], comparacao['parcial']), (2, 50, True))
 
+    def test_faturamento_ticket_medio_e_volume_por_servico(self):
+        self.atendimento(QUINTA, self.ricardo, self.joao, self.corte, self.barba)  # 65
+        self.atendimento(QUINTA, self.paulo, self.carlos, self.corte)  # 40
+        self.atendimento(QUINTA, self.paulo, self.carlos)  # sem serviço: R$ 0
+        r = calcular(self.barbearia, self.semana(), QUINTA)
+        self.assertEqual(r['faturamento'], Decimal('105.00'))
+        self.assertEqual(r['ticket_medio'], Decimal('35.00'))
+        self.assertEqual(
+            [(s['descricao'], s['quantidade'], s['valor']) for s in r['por_servico']],
+            [('Corte', 2, Decimal('80.00')), ('Barba', 1, Decimal('25.00'))],
+        )
+        # Corte + barba no mesmo atendimento: um atendimento só, com os dois valores.
+        self.assertEqual(
+            [(b['barbeiro__nome'], b['quantidade'], b['valor']) for b in r['por_barbeiro']],
+            [('Paulo', 2, Decimal('40.00')), ('Ricardo', 1, Decimal('65.00'))],
+        )
+        self.assertEqual(r['dias'][0]['valor'], Decimal('105.00'))
+
+    def test_reajuste_de_preco_nao_muda_o_faturamento_passado(self):
+        self.atendimento(QUINTA, self.ricardo, self.joao, self.corte)
+        Servico.objects.filter(pk=self.corte.pk).update(preco=Decimal('60.00'))
+        self.assertEqual(calcular(self.barbearia, self.semana(), QUINTA)['faturamento'], Decimal('40.00'))
+
+    def test_comparacao_do_faturamento(self):
+        self.atendimento(date(2026, 9, 22), self.ricardo, self.joao, self.corte)  # semana passada: 40
+        self.atendimento(QUINTA, self.ricardo, self.joao, self.corte, self.barba)  # esta semana: 65
+        comparacao = calcular(self.barbearia, self.semana(), QUINTA)['comparacao']
+        self.assertEqual((comparacao['faturamento'], comparacao['variacao_faturamento']), (Decimal('40.00'), 62))
+
     def test_nao_mistura_barbearias(self):
         outra = Barbearia.objects.create(nome='Outra')
         Atendimento.objects.create(
@@ -144,19 +173,19 @@ class CalculoTests(BaseBalanco):
 
 
 class TelaBalancoTests(BaseBalanco):
-    URL = '/balanco/?periodo=semana&data=2026-10-01'
+    URL = '/historico/?periodo=semana&data=2026-10-01'
 
     def setUp(self):
         self.atendimento(QUINTA, self.ricardo, self.joao, self.corte)
         self.atendimento(QUINTA, self.paulo, self.carlos, self.barba)
 
     def test_sem_login_vai_para_a_tela_de_entrar(self):
-        resposta = self.client.get('/balanco/')
+        resposta = self.client.get('/historico/')
         self.assertEqual(resposta.status_code, 302)
 
     def test_abre_na_semana_atual(self):
         self.client.force_login(self.dono)
-        resposta = self.client.get('/balanco/')
+        resposta = self.client.get('/historico/')
         self.assertEqual(resposta.context['periodo'], Periodo.do_tipo('semana', timezone.localdate()))
 
     def test_dono_ve_todos_e_pode_filtrar(self):
@@ -169,10 +198,22 @@ class TelaBalancoTests(BaseBalanco):
         self.assertNotContains(resposta, 'João Pereira')
         self.assertContains(resposta, 'Carlos Mendes')
 
+    def test_mostra_faturamento_e_servicos(self):
+        self.client.force_login(self.dono)
+        resposta = self.client.get(self.URL)
+        self.assertContains(resposta, 'Histórico de atendimentos')
+        self.assertContains(resposta, 'R$ 65,00')  # corte 40 + barba 25
+        self.assertContains(resposta, 'Serviços')
+
+    def test_endereco_antigo_do_balanco_redireciona(self):
+        self.client.force_login(self.dono)
+        resposta = self.client.get('/balanco/?periodo=semana&data=2026-10-01')
+        self.assertRedirects(resposta, self.URL)
+
     def test_barbeiro_ve_so_o_proprio_mesmo_trocando_a_url(self):
         self.client.force_login(self.usuario_ricardo)
         resposta = self.client.get(f'{self.URL}&barbeiro={self.paulo.pk}')
-        self.assertContains(resposta, 'Meu balanço')
+        self.assertContains(resposta, 'Meu histórico')
         self.assertContains(resposta, 'João Pereira')
         self.assertNotContains(resposta, 'Carlos Mendes')
         self.assertNotContains(resposta, 'Por barbeiro')
@@ -185,7 +226,7 @@ class TelaBalancoTests(BaseBalanco):
         resposta = self.client.get(self.URL)
         self.assertContains(resposta, 'ainda não está ligado a um barbeiro')
         self.assertNotContains(resposta, 'João Pereira')
-        self.assertEqual(self.client.get('/balanco/exportar/').status_code, 404)
+        self.assertEqual(self.client.get('/historico/exportar/').status_code, 404)
 
     def test_barbeiro_de_outra_barbearia_da_404(self):
         outra = Barbearia.objects.create(nome='Outra')
@@ -196,16 +237,16 @@ class TelaBalancoTests(BaseBalanco):
     def test_csv_do_periodo(self):
         Cliente.objects.filter(pk=self.carlos.pk).update(nome='=HIPERLINK("x")')
         self.client.force_login(self.dono)
-        resposta = self.client.get('/balanco/exportar/?periodo=semana&data=2026-10-01')
+        resposta = self.client.get('/historico/exportar/?periodo=semana&data=2026-10-01')
         conteudo = resposta.content.decode('utf-8-sig')
-        self.assertIn('01/10/2026;sem horário;João Pereira;Ricardo;', conteudo)
+        self.assertIn('01/10/2026;sem horário;João Pereira;Ricardo;Corte;40,00;', conteudo)
         self.assertNotIn('R$', conteudo)
         # O nome começado por "=" não vira fórmula no Excel.
         self.assertIn(';"\'=HIPERLINK(""x"")";', conteudo)
 
     def test_csv_do_barbeiro_so_tem_os_dele(self):
         self.client.force_login(self.usuario_ricardo)
-        conteudo = self.client.get('/balanco/exportar/?periodo=semana&data=2026-10-01').content.decode('utf-8-sig')
+        conteudo = self.client.get('/historico/exportar/?periodo=semana&data=2026-10-01').content.decode('utf-8-sig')
         self.assertIn('João Pereira', conteudo)
         self.assertNotIn('Carlos Mendes', conteudo)
 
@@ -214,16 +255,24 @@ class RegistrarAtendimentoTests(BaseBalanco):
     URL = '/atendimentos/novo/'
 
     def dados(self, **extra):
-        return {'barbeiro': self.ricardo.pk, 'data': timezone.localdate().isoformat(), **extra}
+        return {'barbeiro': self.ricardo.pk, 'data': timezone.localdate().isoformat(), 'servicos': [self.corte.pk], **extra}
 
     def test_registra_atendimento(self):
         self.client.force_login(self.dono)
         resposta = self.client.post(self.URL, self.dados(cliente=self.joao.pk))
         at = Atendimento.objects.get()
         self.assertEqual((at.cliente, at.barbeiro, at.agendamento), (self.joao, self.ricardo, None))
-        # Sem serviços e sem valor por enquanto.
-        self.assertFalse(at.itens.exists())
-        self.assertRedirects(resposta, f'/balanco/?periodo=dia&data={at.data.isoformat()}&barbeiro={self.ricardo.pk}')
+        # O serviço marcado vira item, com o preço copiado do cadastro.
+        self.assertEqual([(i.descricao, i.valor) for i in at.itens.all()], [('Corte', Decimal('40.00'))])
+        self.assertRedirects(resposta, f'/historico/?periodo=dia&data={at.data.isoformat()}&barbeiro={self.ricardo.pk}')
+
+    def test_varios_servicos_e_servico_obrigatorio(self):
+        self.client.force_login(self.dono)
+        self.client.post(self.URL, self.dados(cliente=self.joao.pk, servicos=[self.corte.pk, self.barba.pk]))
+        self.assertEqual(Atendimento.objects.get().total, Decimal('65.00'))
+        resposta = self.client.post(self.URL, self.dados(cliente=self.joao.pk, servicos=[]))
+        self.assertContains(resposta, 'Marque pelo menos um serviço')
+        self.assertEqual(Atendimento.objects.count(), 1)
 
     def test_cliente_novo_com_telefone_ja_cadastrado_vai_para_a_ficha_existente(self):
         self.client.force_login(self.dono)

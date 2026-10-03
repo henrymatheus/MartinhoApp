@@ -7,7 +7,7 @@ from django.utils import timezone
 from apps.cadastros.models import Barbeiro, Cliente, Servico, encontrar_ou_criar_cliente
 
 from .disponibilidade import ausente_em
-from .models import Agendamento, Atendimento
+from .models import Agendamento, Atendimento, ItemAtendimento
 
 
 class AgendamentoForm(forms.ModelForm):
@@ -65,7 +65,7 @@ class AtendimentoAvulsoForm(forms.Form):
     Registra um atendimento de quem chegou sem hora marcada.
 
     Não cria agendamento: o atendimento já aconteceu (ou está acontecendo),
-    então vai direto para o histórico do cliente e para o balanço. O cliente
+    então vai direto para a ficha do cliente e para o histórico. O cliente
     é escolhido da lista ou cadastrado ali mesmo, só com nome e WhatsApp.
     """
 
@@ -81,6 +81,14 @@ class AtendimentoAvulsoForm(forms.Form):
         help_text='Se o número já estiver cadastrado, o atendimento vai para a ficha existente.',
     )
     barbeiro = forms.ModelChoiceField(queryset=Barbeiro.objects.none(), empty_label=None)
+    # Os serviços feitos (corte, barba...): dão o valor do atendimento no
+    # histórico. Pode marcar mais de um.
+    servicos = forms.ModelMultipleChoiceField(
+        label='Serviços',
+        queryset=Servico.objects.none(),
+        widget=forms.CheckboxSelectMultiple,
+        error_messages={'required': 'Marque pelo menos um serviço.'},
+    )
     data = forms.DateField(widget=forms.DateInput(attrs={'type': 'date'}, format='%Y-%m-%d'))
     observacoes = forms.CharField(label='Observações', required=False, widget=forms.Textarea(attrs={'rows': 2}))
 
@@ -90,6 +98,8 @@ class AtendimentoAvulsoForm(forms.Form):
         self.barbearia = barbearia
         self.fields['cliente'].queryset = Cliente.objects.filter(barbearia=barbearia)
         self.fields['barbeiro'].queryset = barbeiros
+        self.fields['servicos'].queryset = Servico.objects.filter(barbearia=barbearia, ativo=True)
+        self.fields['servicos'].label_from_instance = lambda s: f'{s.nome} · R$ {s.preco}'
         self.initial.setdefault('data', timezone.localdate())
         possiveis = list(barbeiros)
         if len(possiveis) == 1:
@@ -113,11 +123,11 @@ class AtendimentoAvulsoForm(forms.Form):
     @transaction.atomic
     def save(self):
         """
-        Grava cliente novo (se for o caso) e atendimento juntos: tudo ou nada.
+        Grava cliente novo (se for o caso), atendimento e serviços juntos:
+        tudo ou nada.
 
-        Sem serviços por enquanto (decisão do dono): o atendimento é gravado
-        sem itens, então não tem valor. O model já aceita itens, para quando
-        serviços e valores entrarem.
+        Cada serviço marcado vira um item do atendimento, com o nome e o
+        preço do cadastro copiados naquele momento (ItemAtendimento.save).
         """
         dados = self.cleaned_data
         cliente = dados['cliente']
@@ -134,4 +144,6 @@ class AtendimentoAvulsoForm(forms.Form):
             data=dados['data'],
             observacoes=dados['observacoes'],
         )
+        for servico in dados['servicos']:
+            ItemAtendimento.objects.create(atendimento=atendimento, servico=servico)
         return atendimento
