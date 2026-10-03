@@ -10,7 +10,7 @@ Guia completo (cores, tipografia, tom de voz, componentes): https://claude.ai/ar
 | `martinho-icone-app.svg` | Ícone quadrado do PWA (512px) |
 | `martinho-assinatura-azul.svg` / `-branco.svg` | Símbolo + nome: menu lateral e login |
 | `martinho-logotipo-azul.svg` / `-branco.svg` | Só o nome, com sublinhado dourado |
-| `tokens.json` | Cores (claro e escuro), tipografia, espaçamento, raios e sombras. Fonte das variáveis CSS do app (`web/app/estilos/tokens.css`) |
+| `tokens.json` | Cores (claro e escuro), tipografia, espaçamento, raios e sombras. Fonte das variáveis CSS do front-end |
 
 ## Resumo
 
