@@ -1,0 +1,15 @@
+{% extends 'base.html' %}
+{% block titulo %}Sem barbearia{% endblock %}
+{% block classe_pagina %}pagina--estreita{% endblock %}
+{% block conteudo %}
+<div class="cartao formulario">
+  <h1 class="titulo">Seu usuário ainda não está ligado a uma barbearia</h1>
+  <p>Para usar a agenda e os clientes, o usuário <strong>{{ user.username }}</strong> precisa pertencer a uma barbearia.</p>
+  {% if user.is_staff %}
+    <p>Na administração, abra <strong>Usuários</strong>, escolha o seu usuário e selecione a barbearia no campo <strong>Barbearia</strong>. Se ainda não há nenhuma, cadastre em <strong>Barbearias</strong> primeiro.</p>
+    <div class="linha-acoes"><a class="btn btn--primario" href="{% url 'admin:index' %}">Abrir a administração</a></div>
+  {% else %}
+    <p>Peça ao dono da barbearia para fazer essa ligação.</p>
+  {% endif %}
+</div>
+{% endblock %}

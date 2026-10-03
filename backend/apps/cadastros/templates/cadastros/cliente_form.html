@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+{% block titulo %}{% if object %}Editar cliente{% else %}Novo cliente{% endif %}{% endblock %}
+{% block classe_pagina %}pagina--estreita{% endblock %}
+{% block conteudo %}
+<div class="cabecalho">
+  <h1 class="titulo">{% if object %}Editar {{ object.nome }}{% else %}Novo cliente{% endif %}</h1>
+</div>
+<form class="cartao formulario" method="post" novalidate>
+  {% csrf_token %}
+  {% for erro in form.non_field_errors %}<p class="erro-geral">{{ erro }}</p>{% endfor %}
+  {% include 'includes/campo.html' with campo=form.nome %}
+  <div class="formulario__grade">
+    {% include 'includes/campo.html' with campo=form.telefone %}
+    {% include 'includes/campo.html' with campo=form.data_nascimento %}
+  </div>
+  {% include 'includes/campo.html' with campo=form.email %}
+  {% include 'includes/campo.html' with campo=form.endereco %}
+  {% include 'includes/campo.html' with campo=form.observacoes %}
+  <div class="linha-acoes">
+    <button class="btn btn--primario" type="submit">{% if object %}Salvar{% else %}Cadastrar{% endif %}</button>
+    <a class="btn btn--secundario" href="{% if object %}{% url 'cadastros:cliente' object.pk %}{% else %}{% url 'cadastros:clientes' %}{% endif %}">Voltar</a>
+  </div>
+</form>
+{% endblock %}

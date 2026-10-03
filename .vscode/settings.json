@@ -1,6 +1,6 @@
 {
-  // Terminais novos já abrem na pasta do app (web/), onde rodam npm run dev e npm test.
-  "terminal.integrated.cwd": "${workspaceFolder}/web",
-  // Usa o TypeScript instalado no projeto, na mesma versão do build.
-  "typescript.tsdk": "web/node_modules/typescript/lib"
+  // Faz o VS Code usar a venv do back-end: no editor e em todo terminal novo.
+  "python.defaultInterpreterPath": "${workspaceFolder}/backend/.venv/Scripts/python.exe",
+  "python.terminal.activateEnvironment": true,
+  "terminal.integrated.cwd": "${workspaceFolder}/backend"
 }
