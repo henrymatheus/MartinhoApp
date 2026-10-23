@@ -35,6 +35,24 @@ p { margin: 0; }
 .topo__usuario { display: flex; align-items: center; gap: var(--espaco-3); color: var(--texto-suave); font-size: 13px; }
 .topo__usuario form { margin: 0; }
 
+/* Nav com até 6 itens: no celular, rola para o lado em vez de quebrar o topo. */
+.nav { overflow-x: auto; scrollbar-width: none; }
+.nav a { white-space: nowrap; }
+
+/* ---------- Parceiros ----------
+   Cada logo fica numa caixa de tamanho fixo e se ajusta dentro dela
+   (object-fit: contain), seja larga, alta ou quadrada: o layout não quebra. */
+.rodape { max-width: 960px; margin: 0 auto; padding: 0 var(--espaco-4) var(--espaco-6); }
+.parceiros { display: flex; flex-direction: column; align-items: center; gap: var(--espaco-3); padding: var(--espaco-4) var(--espaco-4) 0; }
+.parceiros__lista { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: var(--espaco-3); }
+.parceiros__logo { display: flex; align-items: center; justify-content: center; width: 120px; height: 56px; padding: var(--espaco-2);
+  background: var(--superficie); border: 1px solid var(--linha); border-radius: var(--raio-md); }
+.parceiros__logo img { max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; }
+a.parceiros__logo:hover { border-color: var(--linha-forte); }
+.parceiros-gestao { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--espaco-3); }
+.parceiros-gestao__item { display: flex; align-items: center; gap: var(--espaco-4); flex-wrap: wrap; }
+.parceiros-gestao__textos { display: flex; flex-direction: column; flex: 1; min-width: 160px; overflow-wrap: anywhere; }
+
 .pagina { max-width: 960px; margin: 0 auto; padding: var(--espaco-6) var(--espaco-4) var(--espaco-8); display: flex; flex-direction: column; gap: var(--espaco-6); }
 .pagina--estreita { max-width: 560px; }
 .cabecalho { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--espaco-4); flex-wrap: wrap; }

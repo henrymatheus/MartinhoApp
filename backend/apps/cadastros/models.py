@@ -1,8 +1,10 @@
+import os
+import uuid
 from datetime import datetime, time, timedelta
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.core.validators import MinValueValidator
+from django.core.validators import MinValueValidator, URLValidator
 from django.db import models
 from django.utils import timezone
 
@@ -76,6 +78,36 @@ class Cliente(PertenceABarbearia):
 
     def link_whatsapp(self, mensagem=''):
         return link_whatsapp(self.telefone, mensagem)
+
+
+def caminho_da_logo(parceiro, nome_do_arquivo):
+    """
+    Onde a logo é guardada: parceiros/<id da barbearia>/<nome aleatório>.png.
+    O nome aleatório evita que um envio substitua o arquivo de outro e que
+    alguém adivinhe o endereço das logos.
+    """
+    extensao = os.path.splitext(nome_do_arquivo)[1].lower()
+    return f'parceiros/{parceiro.barbearia_id}/{uuid.uuid4().hex}{extensao}'
+
+
+class Parceiro(PertenceABarbearia):
+    """
+    Empresa parceira da barbearia. A logo aparece no rodapé do sistema e da
+    página de agendamento, só desta barbearia (filtro pelo campo `barbearia`).
+    """
+
+    nome = models.CharField(max_length=80)
+    # FileField em vez de ImageField: o ImageField exige a biblioteca Pillow,
+    # e o formato é conferido pelo conteúdo do arquivo em logos.py.
+    logo = models.FileField(upload_to=caminho_da_logo, max_length=200)
+    link = models.URLField(blank=True, max_length=300, validators=[URLValidator(schemes=['http', 'https'])])
+    ordem = models.PositiveSmallIntegerField(default=0, help_text='Menor aparece primeiro.')
+
+    class Meta:
+        ordering = ['ordem', 'nome']
+
+    def __str__(self):
+        return self.nome
 
 
 def encontrar_ou_criar_cliente(barbearia, nome, telefone):

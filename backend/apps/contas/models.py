@@ -18,6 +18,16 @@ class Barbearia(models.Model):
     agendamento_online = models.BooleanField(
         'agendamento online', default=True, help_text='Permite que clientes agendem pela página pública.'
     )
+    # Recurso "Parceiros" (logos de empresas parceiras). Fica desligado até o
+    # administrador do Martinho liberar, porque pode virar parte de um plano
+    # pago. O limite também é por barbearia, para um plano maior liberar mais.
+    parceiros_habilitado = models.BooleanField(
+        'parceiros liberados', default=False,
+        help_text='Libera a tela Parceiros e as logos para esta barbearia. Só o administrador do Martinho altera.',
+    )
+    limite_parceiros = models.PositiveSmallIntegerField(
+        'limite de parceiros', default=3, help_text='Quantos parceiros esta barbearia pode cadastrar.'
+    )
     criado_em = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -40,6 +50,16 @@ class Barbearia(models.Model):
 
     def link_whatsapp(self, mensagem=''):
         return link_whatsapp(self.telefone, mensagem)
+
+    def parceiros_visiveis(self):
+        """
+        Os parceiros que aparecem no rodapé, só os desta barbearia. Com o
+        recurso desligado, nenhum. Se o limite baixar (troca de plano), os
+        que passarem do limite deixam de aparecer, mas não são apagados.
+        """
+        if not self.parceiros_habilitado:
+            return []
+        return list(self.parceiro_set.all()[: self.limite_parceiros])
 
 
 class Usuario(AbstractUser):
@@ -64,6 +84,10 @@ class Usuario(AbstractUser):
         blank=True,
     )
     papel = models.CharField(max_length=10, choices=Papel.choices, default=Papel.DONO)
+
+    @property
+    def e_dono(self):
+        return self.papel == self.Papel.DONO
 
 
 class PertenceABarbearia(models.Model):

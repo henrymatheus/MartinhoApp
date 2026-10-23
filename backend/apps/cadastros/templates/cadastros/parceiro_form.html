@@ -1,0 +1,22 @@
+{% extends 'base.html' %}
+{% block titulo %}{% if object %}Editar parceiro{% else %}Novo parceiro{% endif %}{% endblock %}
+{% block classe_pagina %}pagina--estreita{% endblock %}
+{% block conteudo %}
+<div class="cabecalho">
+  <h1 class="titulo">{% if object %}Editar {{ object.nome }}{% else %}Novo parceiro{% endif %}</h1>
+</div>
+{# enctype multipart: obrigatório para o navegador enviar o arquivo da logo. #}
+<form class="cartao formulario" method="post" enctype="multipart/form-data" novalidate>
+  {% csrf_token %}
+  {% for erro in form.non_field_errors %}<p class="erro-geral">{{ erro }}</p>{% endfor %}
+  {% include 'includes/campo.html' with campo=form.nome %}
+  {% if object %}<span class="parceiros__logo"><img src="{{ object.logo.url }}" alt="Logo atual de {{ object.nome }}"></span>{% endif %}
+  {% include 'includes/campo.html' with campo=form.logo %}
+  {% include 'includes/campo.html' with campo=form.link %}
+  {% include 'includes/campo.html' with campo=form.ordem %}
+  <div class="linha-acoes">
+    <button class="btn btn--primario" type="submit">{% if object %}Salvar{% else %}Cadastrar{% endif %}</button>
+    <a class="btn btn--secundario" href="{% url 'cadastros:parceiros' %}">Voltar</a>
+  </div>
+</form>
+{% endblock %}

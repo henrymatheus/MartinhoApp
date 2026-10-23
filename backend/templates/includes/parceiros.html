@@ -1,0 +1,17 @@
+{# Faixa de logos dos parceiros. Recebe `parceiros` já filtrados pela barbearia (Barbearia.parceiros_visiveis). #}
+{% if parceiros %}
+<section class="parceiros" aria-label="Parceiros">
+  <span class="rotulo">Parceiros</span>
+  <ul class="parceiros__lista">
+    {% for p in parceiros %}
+      <li>
+        {% if p.link %}
+          <a class="parceiros__logo" href="{{ p.link }}" target="_blank" rel="noopener nofollow sponsored" title="{{ p.nome }}"><img src="{{ p.logo.url }}" alt="{{ p.nome }}" loading="lazy"></a>
+        {% else %}
+          <span class="parceiros__logo" title="{{ p.nome }}"><img src="{{ p.logo.url }}" alt="{{ p.nome }}" loading="lazy"></span>
+        {% endif %}
+      </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}

@@ -1,7 +1,10 @@
 from django import forms
+from django.core.files.storage import default_storage
+from django.core.files.uploadedfile import UploadedFile
 from django.db import transaction
 
-from .models import Bloqueio, Cliente, HorarioTrabalho
+from .logos import validar_logo
+from .models import Bloqueio, Cliente, HorarioTrabalho, Parceiro, Servico
 
 
 class ClienteForm(forms.ModelForm):
@@ -104,3 +107,68 @@ class BloqueioForm(forms.ModelForm):
     def __init__(self, *args, barbeiro, **kwargs):
         super().__init__(*args, **kwargs)
         self.instance.barbeiro = barbeiro
+
+
+class ServicoForm(forms.ModelForm):
+    class Meta:
+        model = Servico
+        fields = ['nome', 'preco', 'duracao_minutos', 'ativo']
+        # Preço no formato brasileiro: aceita "45,50" (e também "45.50").
+        localized_fields = ['preco']
+        widgets = {
+            'preco': forms.TextInput(attrs={'inputmode': 'decimal', 'placeholder': '45,00'}),
+            'duracao_minutos': forms.NumberInput(attrs={'min': 5, 'step': 5}),
+        }
+        help_texts = {
+            'preco': 'O novo preço vale para os próximos atendimentos. O histórico guarda o preço do dia.',
+            'duracao_minutos': 'Define quanto tempo o horário ocupa na agenda.',
+            'ativo': 'Desmarque para tirar o serviço da agenda e da página de agendamento. O histórico continua.',
+        }
+
+    def __init__(self, *args, barbearia, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.instance.barbearia = barbearia
+
+    def clean_nome(self):
+        # O banco já impede dois serviços com o mesmo nome na barbearia; aqui
+        # a mensagem sai amigável (e sem diferenciar maiúsculas) em vez de erro.
+        nome = self.cleaned_data['nome'].strip()
+        repetido = Servico.objects.filter(barbearia=self.instance.barbearia, nome__iexact=nome).exclude(pk=self.instance.pk)
+        if repetido.exists():
+            raise forms.ValidationError('Já existe um serviço com esse nome.')
+        return nome
+
+
+class ParceiroForm(forms.ModelForm):
+    class Meta:
+        model = Parceiro
+        fields = ['nome', 'logo', 'link', 'ordem']
+        widgets = {
+            # FileInput simples: sem o "Atualmente: <caminho>" do widget padrão.
+            'logo': forms.FileInput(attrs={'accept': '.png,.jpg,.jpeg,.svg,image/png,image/jpeg,image/svg+xml'}),
+            'link': forms.URLInput(attrs={'placeholder': 'https://'}),
+        }
+        help_texts = {'logo': 'PNG, JPG ou SVG, até 2 MB. Fundo transparente fica melhor.'}
+
+    def __init__(self, *args, barbearia, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.instance.barbearia = barbearia
+        self.logo_anterior = self.instance.logo.name if self.instance.pk else ''
+        if self.instance.pk:
+            self.fields['logo'].required = False
+            self.fields['logo'].help_text = 'Envie só se quiser trocar a logo. ' + self.fields['logo'].help_text
+
+    def clean_logo(self):
+        arquivo = self.cleaned_data.get('logo')
+        # Na edição sem arquivo novo, chega a logo atual (já validada).
+        if isinstance(arquivo, UploadedFile):
+            extensao = validar_logo(arquivo)
+            arquivo.name = f'logo{extensao}'  # o caminho final é sorteado em caminho_da_logo
+        return arquivo
+
+    def save(self, commit=True):
+        parceiro = super().save(commit)
+        # Trocou a logo: apaga o arquivo antigo do armazenamento.
+        if commit and self.logo_anterior and parceiro.logo.name != self.logo_anterior:
+            default_storage.delete(self.logo_anterior)
+        return parceiro

@@ -1,0 +1,38 @@
+{% extends 'base.html' %}
+{% block titulo %}Parceiros{% endblock %}
+{% block conteudo %}
+<div class="cabecalho">
+  <div class="cabecalho__textos">
+    <h1 class="titulo">Parceiros</h1>
+    <p class="legenda">{{ parceiros|length }} de {{ limite }} · As logos aparecem no rodapé do sistema e da sua página de agendamento.</p>
+  </div>
+  {% if pode_cadastrar %}<a class="btn btn--primario" href="{% url 'cadastros:novo_parceiro' %}">Novo parceiro</a>{% endif %}
+</div>
+
+{% if parceiros %}
+  <ul class="parceiros-gestao">
+    {% for p in parceiros %}
+      <li class="cartao parceiros-gestao__item">
+        <span class="parceiros__logo"><img src="{{ p.logo.url }}" alt="Logo de {{ p.nome }}"></span>
+        <div class="parceiros-gestao__textos">
+          <span class="corpo-forte">{{ p.nome }}</span>
+          {% if p.link %}<a class="legenda" href="{{ p.link }}" target="_blank" rel="noopener nofollow">{{ p.link }}</a>{% else %}<span class="legenda">Sem link</span>{% endif %}
+        </div>
+        <div class="linha-acoes">
+          <a class="btn btn--secundario btn--pequeno" href="{% url 'cadastros:editar_parceiro' p.pk %}">Editar</a>
+          <form method="post" action="{% url 'cadastros:remover_parceiro' p.pk %}" onsubmit="return confirm('Remover o parceiro {{ p.nome|escapejs }}?');">
+            {% csrf_token %}<button class="btn btn--perigo btn--pequeno" type="submit">Remover</button>
+          </form>
+        </div>
+      </li>
+    {% endfor %}
+  </ul>
+  {% if not pode_cadastrar %}<p class="legenda">Limite de {{ limite }} parceiros atingido. Remova um para cadastrar outro.</p>{% endif %}
+{% else %}
+  <div class="cartao vazio">
+    <p class="subtitulo">Nenhum parceiro cadastrado ainda</p>
+    <p>Até {{ limite }} logos de empresas parceiras.</p>
+    <a class="btn btn--primario" href="{% url 'cadastros:novo_parceiro' %}">Novo parceiro</a>
+  </div>
+{% endif %}
+{% endblock %}

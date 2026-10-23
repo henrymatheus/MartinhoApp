@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+{% block titulo %}Serviços{% endblock %}
+{% block conteudo %}
+<div class="cabecalho">
+  <div class="cabecalho__textos">
+    <h1 class="titulo">Serviços</h1>
+    <p class="legenda">Nome, preço e duração de cada serviço. Só o dono altera.</p>
+  </div>
+  <a class="btn btn--primario" href="{% url 'cadastros:novo_servico' %}">Novo serviço</a>
+</div>
+
+{% if servicos %}
+  <div class="tabela-rolagem">
+    <table class="tabela">
+      <thead><tr><th>Serviço</th><th>Preço</th><th>Duração</th><th>Situação</th></tr></thead>
+      <tbody>
+        {% for s in servicos %}
+          <tr>
+            <td><a href="{% url 'cadastros:editar_servico' s.pk %}">{{ s.nome }}</a></td>
+            <td>R$ {{ s.preco }}</td>
+            <td>{{ s.duracao_minutos }} min</td>
+            <td>{% if s.ativo %}<span class="status status--concluido">Ativo</span>{% else %}<span class="status status--cancelado">Desativado</span>{% endif %}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% else %}
+  <div class="cartao vazio">
+    <p class="subtitulo">Nenhum serviço cadastrado ainda</p>
+    <p>Cadastre os serviços para a agenda e a página de agendamento.</p>
+    <a class="btn btn--primario" href="{% url 'cadastros:novo_servico' %}">Novo serviço</a>
+  </div>
+{% endif %}
+{% endblock %}

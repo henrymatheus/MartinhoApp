@@ -52,6 +52,24 @@ Os valores atuais estão no painel do Render (Environment). Copie de lá antes d
 
 Por que o Transaction pooler: na Vercel o Django roda em várias cópias que nascem e morrem conforme o movimento, e cada requisição abre e fecha a própria conexão. O pooler divide poucas conexões reais do Supabase gratuito entre todas essas cópias.
 
+### Logos dos parceiros (Supabase Storage)
+
+O servidor da Vercel não guarda arquivos: as logos enviadas na tela Parceiros ficam no Supabase Storage. Sem as variáveis abaixo, o upload falha em produção; por isso, só libere Parceiros para uma barbearia depois de configurar o armazenamento.
+
+1. No Supabase, **Storage > New bucket**: nome `arquivos`, marcado como **Public bucket** (as logos aparecem para qualquer visitante da página de agendamento). Em "Allowed MIME types", deixe vazio ou libere `image/png, image/jpeg, image/svg+xml`.
+2. **Storage > Settings > S3 Connection**: copie o **Endpoint** e a **Region**, e em **S3 Access Keys** crie uma chave (copie o Access key ID e o Secret access key; o secret só aparece uma vez).
+3. Cadastre na Vercel:
+
+| Variável | Valor |
+|---|---|
+| `SUPABASE_S3_ENDPOINT` | o Endpoint, ex.: `https://<projeto>.supabase.co/storage/v1/s3` |
+| `SUPABASE_S3_REGIAO` | a Region, ex.: `sa-east-1` |
+| `SUPABASE_S3_CHAVE_ID` | Access key ID |
+| `SUPABASE_S3_CHAVE_SECRETA` | Secret access key |
+| `SUPABASE_BUCKET` | `arquivos` (opcional; é o padrão) |
+
+4. Na Administração, em **Barbearias**, marque **parceiros liberados** e ajuste o **limite de parceiros** (padrão 3). Só o superusuário altera esses dois campos.
+
 ### Migrations
 
 A Vercel não roda `migrate`. Quando um model mudar, rode na sua máquina, apontando para o banco de produção:
@@ -74,8 +92,8 @@ python manage.py test apps
 
 | Pasta | O que tem |
 |---|---|
-| `apps/contas` | `Barbearia`, `Usuario`, a base `PertenceABarbearia` e o `DaBarbeariaMixin` das telas |
-| `apps/cadastros` | `Barbeiro`, `Servico`, `Cliente`, `HorarioTrabalho`, `Bloqueio` e as telas de clientes e horários |
+| `apps/contas` | `Barbearia`, `Usuario`, a base `PertenceABarbearia` e os mixins das telas (`DaBarbeariaMixin`, `SoDonoMixin`) |
+| `apps/cadastros` | `Barbeiro`, `Servico`, `Cliente`, `HorarioTrabalho`, `Bloqueio`, `Parceiro`, as telas de clientes, horários, serviços e parceiros, e a validação das logos (`logos.py`) |
 | `apps/agenda` | `Agendamento`, `Atendimento`, `ItemAtendimento`, a agenda do dia, o cálculo de horários livres (`disponibilidade.py`) e o comando `dados_demo` |
 | `apps/publico` | Página de agendamento do cliente (sem login) e os arquivos do PWA |
 | `templates/` | `base.html` (topo e menu), tela de login e trechos reaproveitados |

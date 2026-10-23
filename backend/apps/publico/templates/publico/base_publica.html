@@ -25,6 +25,7 @@
   <main class="publico__conteudo publico__principal">
     {% block conteudo %}{% endblock %}
   </main>
+  {% include 'includes/parceiros.html' with parceiros=barbearia.parceiros_visiveis %}
   <footer class="publico__rodape">
     <img src="{% static 'img/martinho-simbolo.svg' %}" alt="" width="20" height="20">
     <span>Agendamento pelo Martinho</span>

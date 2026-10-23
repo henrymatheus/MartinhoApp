@@ -50,8 +50,16 @@ class DaBarbeariaAdmin(admin.ModelAdmin):
 
 @admin.register(Barbearia)
 class BarbeariaAdmin(admin.ModelAdmin):
-    list_display = ['nome', 'slug', 'telefone', 'agendamento_online', 'criado_em']
+    list_display = ['nome', 'slug', 'telefone', 'agendamento_online', 'parceiros_habilitado', 'limite_parceiros', 'criado_em']
+    list_filter = ['parceiros_habilitado']
     search_fields = ['nome']
+
+    def get_readonly_fields(self, request, obj=None):
+        # Liberar parceiros e mudar o limite é decisão do administrador do
+        # Martinho (futuro plano pago): o dono da barbearia só enxerga.
+        if request.user.is_superuser:
+            return super().get_readonly_fields(request, obj)
+        return ['parceiros_habilitado', 'limite_parceiros']
 
 
 @admin.register(Usuario)

@@ -1,6 +1,7 @@
 import json
 
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.core.exceptions import PermissionDenied
 from django.http import JsonResponse
 from django.shortcuts import render
 from django.views import View
@@ -34,6 +35,21 @@ class DaBarbeariaMixin(LoginRequiredMixin):
         contexto = super().get_context_data(**kwargs)
         contexto['secao'] = self.secao
         return contexto
+
+
+class SoDonoMixin(DaBarbeariaMixin):
+    """
+    Telas que só o dono da barbearia acessa (serviços e preços, parceiros).
+
+    A checagem é feita aqui, no servidor: esconder o item do menu não basta,
+    porque o barbeiro poderia digitar o endereço. Para ele, a resposta é 403
+    (acesso negado).
+    """
+
+    def dispatch(self, request, *args, **kwargs):
+        if request.user.is_authenticated and request.user.barbearia_id and not request.user.e_dono:
+            raise PermissionDenied('Só o dono da barbearia acessa esta tela.')
+        return super().dispatch(request, *args, **kwargs)
 
 
 class InscricaoPushView(LoginRequiredMixin, View):

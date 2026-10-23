@@ -2,7 +2,7 @@ from django.contrib import admin
 
 from apps.contas.admin import DaBarbeariaAdmin
 
-from .models import Barbeiro, Bloqueio, Cliente, HorarioTrabalho, Servico
+from .models import Barbeiro, Bloqueio, Cliente, HorarioTrabalho, Parceiro, Servico
 
 
 class HorarioTrabalhoInline(admin.TabularInline):
@@ -35,3 +35,10 @@ class ClienteAdmin(DaBarbeariaAdmin):
     list_display = ['nome', 'telefone', 'email', 'data_nascimento', 'barbearia']
     list_filter = ['barbearia']
     search_fields = ['nome', 'telefone', 'email']
+
+
+@admin.register(Parceiro)
+class ParceiroAdmin(DaBarbeariaAdmin):
+    list_display = ['nome', 'link', 'ordem', 'barbearia']
+    list_filter = ['barbearia']
+    search_fields = ['nome']

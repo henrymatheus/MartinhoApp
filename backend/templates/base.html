@@ -30,6 +30,10 @@
         <a href="{{ url_clientes }}" {% if secao == 'clientes' %}aria-current="page"{% endif %}>Clientes</a>
         <a href="{% url 'cadastros:horarios' %}" {% if secao == 'horarios' %}aria-current="page"{% endif %}>Horários</a>
         <a href="{% url 'agenda:historico' %}" {% if secao == 'historico' %}aria-current="page"{% endif %}>Histórico</a>
+        {% if user.e_dono and user.barbearia %}
+          <a href="{% url 'cadastros:servicos' %}" {% if secao == 'servicos' %}aria-current="page"{% endif %}>Serviços</a>
+          {% if user.barbearia.parceiros_habilitado %}<a href="{% url 'cadastros:parceiros' %}" {% if secao == 'parceiros' %}aria-current="page"{% endif %}>Parceiros</a>{% endif %}
+        {% endif %}
         {% if user.is_staff %}<a href="{% url 'admin:index' %}">Administração</a>{% endif %}
       </nav>
       <div class="topo__usuario">
@@ -47,6 +51,9 @@
     {% endif %}
     {% block conteudo %}{% endblock %}
   </main>
+  {% if user.barbearia %}
+    <footer class="rodape">{% include 'includes/parceiros.html' with parceiros=user.barbearia.parceiros_visiveis %}</footer>
+  {% endif %}
 {% endblock %}
 <script>
   if ('serviceWorker' in navigator) { navigator.serviceWorker.register('{% url "publico:service_worker" %}'); }

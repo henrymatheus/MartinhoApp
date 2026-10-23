@@ -168,6 +168,17 @@ STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 # CSS, logos e scripts do sistema.
 STATICFILES_DIRS = [BASE_DIR / 'static']
+# Arquivos enviados pelos usuários (logos dos parceiros).
+# - Na sua máquina: pasta backend/media/ (fora do Git).
+# - Em produção: Supabase Storage. O servidor da Vercel não tem disco
+#   permanente; um arquivo gravado nele sumiria. O Supabase Storage aceita o
+#   mesmo protocolo do Amazon S3, então usamos o django-storages (backend S3)
+#   apontado para ele. Ele é ligado quando as variáveis SUPABASE_S3_* existem.
+MEDIA_URL = 'media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+SUPABASE_S3_ENDPOINT = os.environ.get('SUPABASE_S3_ENDPOINT', '').rstrip('/')
+SUPABASE_BUCKET = os.environ.get('SUPABASE_BUCKET', 'arquivos')
+
 STORAGES = {
     'default': {'BACKEND': 'django.core.files.storage.FileSystemStorage'},
     # Sem "Manifest": a API só serve o CSS/JS do admin, então não precisamos
@@ -178,6 +189,26 @@ if NA_VERCEL:
     # Na Vercel, o collectstatic roda sozinho no build e os arquivos são
     # servidos pelo CDN dela; o armazenamento padrão do Django basta.
     STORAGES['staticfiles'] = {'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage'}
+
+if SUPABASE_S3_ENDPOINT and 'test' not in sys.argv:
+    STORAGES['default'] = {
+        'BACKEND': 'storages.backends.s3.S3Storage',
+        'OPTIONS': {
+            'endpoint_url': SUPABASE_S3_ENDPOINT,  # https://<projeto>.supabase.co/storage/v1/s3
+            'region_name': os.environ.get('SUPABASE_S3_REGIAO', ''),
+            'access_key': os.environ.get('SUPABASE_S3_CHAVE_ID', ''),
+            'secret_key': os.environ.get('SUPABASE_S3_CHAVE_SECRETA', ''),
+            'bucket_name': SUPABASE_BUCKET,
+            'addressing_style': 'path',  # o Supabase só aceita o bucket no caminho da URL
+            # O bucket é público (as logos aparecem para qualquer visitante):
+            # o endereço de cada logo é fixo e não precisa de assinatura.
+            'querystring_auth': False,
+            'custom_domain': SUPABASE_S3_ENDPOINT.split('://', 1)[-1].replace(
+                '/storage/v1/s3', f'/storage/v1/object/public/{SUPABASE_BUCKET}'
+            ),
+            'file_overwrite': False,
+        },
+    }
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 

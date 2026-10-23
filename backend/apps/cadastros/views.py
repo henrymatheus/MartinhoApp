@@ -1,5 +1,8 @@
 from django.contrib import messages
+from django.core.files.storage import default_storage
+from django.db import transaction
 from django.db.models import Q
+from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
 from django.utils import timezone
@@ -7,11 +10,11 @@ from django.views import View
 from django.views.generic import CreateView, DetailView, ListView, TemplateView, UpdateView
 
 from apps.agenda.models import Agendamento
-from apps.contas.models import Usuario
-from apps.contas.views import DaBarbeariaMixin
+from apps.contas.models import Barbearia, Usuario
+from apps.contas.views import DaBarbeariaMixin, SoDonoMixin
 
-from .forms import BloqueioForm, ClienteForm, SemanaForm
-from .models import Barbeiro, Bloqueio, Cliente
+from .forms import BloqueioForm, ClienteForm, ParceiroForm, SemanaForm, ServicoForm
+from .models import Barbeiro, Bloqueio, Cliente, Parceiro, Servico
 
 
 class ClientesView(DaBarbeariaMixin, ListView):
@@ -167,3 +170,125 @@ class RemoverFolgaView(DaBarbeariaMixin, View):
         get_object_or_404(Bloqueio, pk=folga, barbeiro=barbeiro).delete()
         messages.success(request, 'Folga removida.')
         return redirect('cadastros:horarios_barbeiro', pk)
+
+
+# ---------- Serviços e preços (só o dono) ----------
+
+
+class ServicosView(SoDonoMixin, ListView):
+    template_name = 'cadastros/servicos.html'
+    context_object_name = 'servicos'
+    secao = 'servicos'
+
+    def get_queryset(self):
+        # Ativos primeiro (o "-" inverte a ordem: True antes de False).
+        return Servico.objects.filter(barbearia=self.barbearia).order_by('-ativo', 'nome')
+
+
+class FormularioServicoMixin(SoDonoMixin):
+    model = Servico
+    form_class = ServicoForm
+    template_name = 'cadastros/servico_form.html'
+    secao = 'servicos'
+
+    def get_queryset(self):
+        # Na edição, um serviço de outra barbearia não é encontrado (404).
+        return Servico.objects.filter(barbearia=self.barbearia)
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['barbearia'] = self.barbearia
+        return kwargs
+
+    def get_success_url(self):
+        return reverse('cadastros:servicos')
+
+
+class NovoServicoView(FormularioServicoMixin, CreateView):
+    def form_valid(self, form):
+        messages.success(self.request, f'Serviço {form.instance.nome} cadastrado.')
+        return super().form_valid(form)
+
+
+class EditarServicoView(FormularioServicoMixin, UpdateView):
+    def form_valid(self, form):
+        messages.success(self.request, f'Serviço {form.instance.nome} atualizado.')
+        return super().form_valid(form)
+
+
+# ---------- Parceiros (só o dono, e só com o recurso liberado) ----------
+
+
+class ParceirosMixin(SoDonoMixin):
+    """
+    Com o recurso desligado para a barbearia, as telas de parceiros não
+    existem para ela (404), mesmo digitando o endereço.
+    """
+
+    secao = 'parceiros'
+
+    def dispatch(self, request, *args, **kwargs):
+        usuario = request.user
+        if usuario.is_authenticated and usuario.barbearia_id and not usuario.barbearia.parceiros_habilitado:
+            raise Http404
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_queryset(self):
+        return Parceiro.objects.filter(barbearia=self.barbearia)
+
+
+class ParceirosView(ParceirosMixin, ListView):
+    template_name = 'cadastros/parceiros.html'
+    context_object_name = 'parceiros'
+
+    def get_context_data(self, **kwargs):
+        contexto = super().get_context_data(**kwargs)
+        contexto['limite'] = self.barbearia.limite_parceiros
+        contexto['pode_cadastrar'] = len(contexto['parceiros']) < self.barbearia.limite_parceiros
+        return contexto
+
+
+class FormularioParceiroMixin(ParceirosMixin):
+    model = Parceiro
+    form_class = ParceiroForm
+    template_name = 'cadastros/parceiro_form.html'
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['barbearia'] = self.barbearia
+        return kwargs
+
+    def get_success_url(self):
+        return reverse('cadastros:parceiros')
+
+
+class NovoParceiroView(FormularioParceiroMixin, CreateView):
+    def form_valid(self, form):
+        # O limite é conferido de novo na hora de gravar, com a barbearia
+        # travada (select_for_update): dois envios ao mesmo tempo não passam
+        # do limite.
+        with transaction.atomic():
+            barbearia = Barbearia.objects.select_for_update().get(pk=self.barbearia.pk)
+            if Parceiro.objects.filter(barbearia=barbearia).count() >= barbearia.limite_parceiros:
+                form.add_error(None, f'O limite é de {barbearia.limite_parceiros} parceiros. Remova um para cadastrar outro.')
+                return self.form_invalid(form)
+            resposta = super().form_valid(form)
+        messages.success(self.request, f'Parceiro {form.instance.nome} cadastrado.')
+        return resposta
+
+
+class EditarParceiroView(FormularioParceiroMixin, UpdateView):
+    def form_valid(self, form):
+        messages.success(self.request, f'Parceiro {form.instance.nome} atualizado.')
+        return super().form_valid(form)
+
+
+class RemoverParceiroView(ParceirosMixin, View):
+    def post(self, request, pk):
+        parceiro = get_object_or_404(self.get_queryset(), pk=pk)
+        arquivo = parceiro.logo.name
+        parceiro.delete()
+        # A linha do banco sai primeiro; o arquivo da logo é apagado em seguida.
+        default_storage.delete(arquivo)
+        messages.success(request, f'Parceiro {parceiro.nome} removido.')
+        return redirect('cadastros:parceiros')

@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+{% block titulo %}{% if object %}Editar serviço{% else %}Novo serviço{% endif %}{% endblock %}
+{% block classe_pagina %}pagina--estreita{% endblock %}
+{% block conteudo %}
+<div class="cabecalho">
+  <h1 class="titulo">{% if object %}Editar {{ object.nome }}{% else %}Novo serviço{% endif %}</h1>
+</div>
+<form class="cartao formulario" method="post" novalidate>
+  {% csrf_token %}
+  {% for erro in form.non_field_errors %}<p class="erro-geral">{{ erro }}</p>{% endfor %}
+  {% include 'includes/campo.html' with campo=form.nome %}
+  <div class="formulario__grade">
+    {% include 'includes/campo.html' with campo=form.preco %}
+    {% include 'includes/campo.html' with campo=form.duracao_minutos %}
+  </div>
+  <div class="campo">
+    <label class="marcar">{{ form.ativo }} Serviço ativo</label>
+    <span class="campo__ajuda">{{ form.ativo.help_text }}</span>
+  </div>
+  <div class="linha-acoes">
+    <button class="btn btn--primario" type="submit">{% if object %}Salvar{% else %}Cadastrar{% endif %}</button>
+    <a class="btn btn--secundario" href="{% url 'cadastros:servicos' %}">Voltar</a>
+  </div>
+</form>
+{% endblock %}

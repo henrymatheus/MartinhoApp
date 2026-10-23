@@ -7,7 +7,7 @@ Legenda de status: ✅ pronto · 🚧 em andamento · 📋 planejado · 🗄️ 
 
 Situação atual: sistema interno (agenda, clientes, histórico, horários, balanço) e agendamento online pelo cliente prontos, instaláveis como app (PWA). No ar em https://martinhoapp.onrender.com (Render + Supabase). 🚧 Hospedagem mudando do Render para a Vercel (plano gratuito), com o mesmo Django e o mesmo banco: falta criar o projeto na Vercel (passo a passo em [backend/README.md](backend/README.md)). Faltam também e-mail de aniversário e backup.
 
-Última atualização: 2026-10-03
+Última atualização: 2026-10-23
 
 ---
 
@@ -48,7 +48,7 @@ Regras fixas:
 |---|---|---|---|
 | 1 | Cadastro de barbearia | ✅ | Pela administração. Base multi-barbearia: cada registro pertence a uma barbearia e cada usuário só vê a sua |
 | 2 | Cadastro de barbeiros | ✅ | Pela administração |
-| 3 | Cadastro de serviços (nome, preço, duração) | ✅ | Pela administração. Nome único por barbearia |
+| 3 | Cadastro de serviços (nome, preço, duração) | ✅ | Aba **Serviços** (`/servicos/`), **só para o dono** (o barbeiro recebe 403 mesmo digitando o endereço). Cadastrar, editar nome, preço (formato `45,50`) e duração, e desativar (sem apagar: some da agenda e da página do cliente, o histórico continua). Nome único por barbearia, sem diferenciar maiúsculas. Reajuste não muda o passado; horário já marcado e ainda não concluído passa a valer o preço novo. Também pela administração |
 | 4 | Cadastro de clientes | ✅ | Tela Clientes: lista com busca por nome ou telefone, cadastro, edição e ficha |
 | 5 | Agendamento | ✅ | Novo agendamento e remarcação. Conflito de horário verificado no `save()` com trava do barbeiro (`select_for_update`); horários encostados e cancelados não conflitam; fim calculado pela duração do serviço. Ações: Concluir, Faltou, Cancelar |
 | 6 | Histórico de atendimentos por cliente | ✅ | Na ficha do cliente. "Concluir atendimento" na agenda registra o histórico com cópia do preço |
@@ -66,6 +66,7 @@ Regras fixas:
 | 18 | Aviso de novo agendamento ao barbeiro | ✅ | Notificação push (grátis, Web Push/VAPID) quando o cliente agenda pela página. O barbeiro toca em "Ativar avisos" no Martinho. Vai para o barbeiro com login; se ele não tiver, para os donos. Precisa das variáveis `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` e `VAPID_EMAIL` (`python manage.py gerar_chaves_push`). iPhone: só com o Martinho instalado na tela inicial (iOS 16.4+) |
 | 19 | Histórico de atendimentos (antiga aba "Balanço") | ✅ | Aba **Histórico** (`/historico/`; o endereço antigo `/balanco/` redireciona). Período: hoje, semana, mês, mês passado ou datas escolhidas. Quantidade de atendimentos e **faturamento**, com comparação com o período anterior até o mesmo dia; gráfico por dia (ou por mês em faixas longas); ticket médio, média por dia, clientes atendidos, faltas e cancelamentos; **volume e valor de cada serviço**; quantidade e valor por barbeiro; lista dia a dia (até 500) com os serviços e o valor de cada atendimento. Valores vêm do preço copiado no dia do atendimento (reajuste não muda o passado). Planilha CSV com serviços e valor. O barbeiro vê só o próprio |
 | 20 | Atendimento sem hora marcada | ✅ | "Sem hora marcada" na Agenda / "Registrar atendimento" no Histórico: vai direto para a ficha do cliente e o histórico, com cliente da lista ou novo (reconhecido pelo telefone). **Serviços feitos obrigatórios** (um ou mais), que dão o valor do atendimento. Data futura recusada; o barbeiro registra só para si. Atendimentos avulsos registrados antes da mudança ficam sem serviço (R$ 0) |
+| 21 | Parceiros (logos de empresas parceiras) | ✅ | Aba **Parceiros** (`/parceiros/`), só para o dono: nome, logo (PNG, JPG ou SVG, até 2 MB, conferidos pelo conteúdo; SVG com script, eventos ou `javascript:` é recusado) e link opcional. Logos em caixas de tamanho fixo no rodapé do sistema e da página de agendamento, só da própria barbearia. **Liberado por barbearia** pelo superusuário na administração (`parceiros liberados`, começa desligado) com **limite por barbearia** (`limite de parceiros`, padrão 3), pensando num plano pago. Limite reduzido esconde os excedentes sem apagar. Arquivos no Supabase Storage (variáveis `SUPABASE_S3_*`, passo a passo em [backend/README.md](backend/README.md)); na máquina local, pasta `backend/media/` |
 
 ## 5. Funcionalidades do sistema legado (desktop Tkinter)
 
@@ -102,6 +103,8 @@ Funcionalidades que existiam em `legacy/main.py`, `legacy/agendamento.py` e `leg
 | 2026-10-03 | Hospedagem do Django muda do Render para a Vercel (plano Hobby, gratuito), com o mesmo banco no Supabase. O dono está ciente de que os termos do plano Hobby permitem só uso não comercial (o Pro custa US$ 20/mês) |
 | 2026-10-03 | Código do desktop Tkinter (`legacy/`) removido do repositório; fica no histórico do git |
 | 2026-10-03 | Aba "Balanço" renomeada para **Histórico** e passa a mostrar valores em dinheiro e o volume de cada serviço (antes, por decisão do dono, só a quantidade de atendimentos). Por isso o atendimento sem hora marcada passa a exigir os serviços feitos |
+| 2026-10-23 | Serviços e preços editáveis pelo sistema, **só pelo dono**. Serviço não é apagado, só desativado (agendamentos e histórico apontam para ele) |
+| 2026-10-23 | Recurso Parceiros com interruptor e limite por barbearia, controlados só pelo superusuário, para virar plano pago no futuro. Logos no Supabase Storage (django-storages, protocolo S3), sem Pillow: o formato é conferido pelos primeiros bytes do arquivo |
 
 ## 7. Fora do MVP (ideias futuras)
 
@@ -128,3 +131,4 @@ Funcionalidades que existiam em `legacy/main.py`, `legacy/agendamento.py` e `leg
 | 2026-10-02 | Versão Next.js + Supabase criada e desfeita; guardada no branch `nextjs` |
 | 2026-10-03 | Deploy preparado para a Vercel: `settings.py` reconhece a Vercel (produção, endereços liberados, banco sem conexões persistentes pelo pooler, estáticos pelo CDN). `legacy/` removida. Incluídas no documento as linhas do Balanço e do atendimento sem hora marcada, e corrigido o fluxo da página do cliente. 113 testes |
 | 2026-10-03 | Aba Balanço vira Histórico de atendimentos, com faturamento, ticket médio, comparação de faturamento, volume e valor por serviço e por barbeiro, valor por dia e por atendimento, e CSV com serviços e valor. Atendimento sem hora marcada exige serviços. Registrada na linha do PWA a correção de cache da página de agendamento (commit de 2026-10-01). 119 testes |
+| 2026-10-23 | Aba Serviços (só o dono) e recurso Parceiros (logos no rodapé do sistema e da página de agendamento, liberação e limite por barbearia). Armazenamento de arquivos no Supabase Storage. Menu rola para o lado no celular. 144 testes |
