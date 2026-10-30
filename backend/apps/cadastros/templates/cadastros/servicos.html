@@ -12,7 +12,7 @@
 {% if servicos %}
   <div class="tabela-rolagem">
     <table class="tabela">
-      <thead><tr><th>Serviço</th><th>Preço</th><th>Duração</th><th>Situação</th></tr></thead>
+      <thead><tr><th>Serviço</th><th>Preço</th><th>Duração</th><th>Situação</th><th></th></tr></thead>
       <tbody>
         {% for s in servicos %}
           <tr>
@@ -20,6 +20,7 @@
             <td>R$ {{ s.preco }}</td>
             <td>{{ s.duracao_minutos }} min</td>
             <td>{% if s.ativo %}<span class="status status--concluido">Ativo</span>{% else %}<span class="status status--cancelado">Desativado</span>{% endif %}</td>
+            <td class="numero"><a class="btn btn--secundario btn--pequeno" href="{% url 'cadastros:editar_servico' s.pk %}">Editar</a></td>
           </tr>
         {% endfor %}
       </tbody>
