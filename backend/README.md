@@ -31,7 +31,7 @@ Não é preciso configurar nada: sem `.env`, o projeto usa SQLite (`db.sqlite3`)
 
 ## Produção (Vercel)
 
-O Django roda na Vercel como uma Vercel Function: a Vercel encontra o `manage.py`, usa o `config.wsgi`, roda o `collectstatic` sozinha no build e serve o CSS e as imagens pelo CDN dela. O `settings.py` reconhece que está na Vercel pela variável `VERCEL`.
+O Django roda na Vercel como uma Vercel Function: a Vercel encontra o `manage.py`, usa o `config.wsgi`, roda o `collectstatic` sozinha no build e serve o CSS e as imagens pelo CDN dela (por isso o WhiteNoise fica desligado lá). O `settings.py` reconhece que está na Vercel pela variável `VERCEL`.
 
 ### Criar o projeto
 
@@ -72,7 +72,11 @@ O servidor da Vercel não guarda arquivos: as logos enviadas na tela Parceiros f
 
 ### Migrations
 
-A Vercel não roda `migrate`. Quando um model mudar, rode na sua máquina, apontando para o banco de produção:
+O deploy de produção (branch `main`) roda o `migrate` sozinho: o `vercel.json` chama o `vercel_build.py` no build. Se o `migrate` falhar, o build falha e a versão anterior continua no ar. As pré-visualizações (outros branches) não rodam o `migrate`, para um branch em teste não alterar o banco de produção.
+
+A variável `DATABASE_URL` precisa estar disponível em **Production** (Settings > Environment Variables). Sem ela, o build para com uma mensagem clara.
+
+Para rodar à mão (por exemplo, para conferir com `showmigrations`), aponte para o banco de produção na sua máquina:
 
 ```powershell
 $env:DATABASE_URL = "<a mesma DATABASE_URL da Vercel>"

@@ -86,6 +86,11 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
+if NA_VERCEL:
+    # Na Vercel os estáticos saem do CDN e a pasta staticfiles/ não vai junto
+    # com a função. O WhiteNoise procuraria essa pasta a cada cópia nova e
+    # avisaria "No directory at: /var/task/staticfiles/".
+    MIDDLEWARE.remove('whitenoise.middleware.WhiteNoiseMiddleware')
 
 ROOT_URLCONF = 'config.urls'
 
